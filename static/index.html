@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Water Reservoir Visualization</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h1>Water Reservoir Visualization</h1>
+    <div>
+        <label for="state-select">Select State:</label>
+        <select id="state-select">
+            <option value="">Select a state</option>
+        </select>
+    </div>
+    <div>
+        <label for="reservoir-select">Select Reservoir:</label>
+        <select id="reservoir-select" disabled>
+            <option value="">Select a reservoir</option>
+        </select>
+    </div>
+    <div>
+        <label for="date-range">Date Range:</label>
+        <input type="text" id="date-range" placeholder="YYYY-MM-DD,YYYY-MM-DD">
+    </div>
+    <div id="plot" style="width:100%; height:500px;"></div>
+    <script src="/static/app.js"></script>
+</body>
+</html>
