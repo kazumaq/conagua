@@ -123,7 +123,7 @@ Now we're in our project directory with our virtual environment active.
 Transfer your project files to the server (you can use SCP, SFTP, or any method you're comfortable with). Once the files are on the server, install the requirements:
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.in
 ```
 
 Now, run the preprocessor to prepare your databases:
@@ -136,46 +136,58 @@ This will create the `reservoir_static.db` and `reservoir_dynamic.db` files on y
 
 ### 4. Serving the Application
 
-Now, we come to an important difference between development and production. While Flask's built-in server is great for development, it's not designed to handle multiple users or high traffic. For production, we'll use a tool called Gunicorn.
+For production, we'll use Gunicorn to serve our application. While Flask's built-in server is great for development, it's not suitable for production environments. Here's why:
 
-Install Gunicorn:
+- Flask's server is single-threaded, handling only one request at a time. This can lead to slow response times under moderate traffic (as low as 10-30 requests per minute).
+- It lacks features needed for production, such as load balancing and process management.
+
+Gunicorn, on the other hand, is a production-ready WSGI server that:
+- Supports multiple worker processes, handling concurrent requests efficiently.
+- Provides better resource management and fault tolerance.
+- Can significantly improve your application's ability to handle traffic, potentially managing hundreds of requests per minute, depending on your server's capacity and application complexity.
+
+There are alternatives to Gunicorn, such as uWSGI, mod_wsgi (for Apache), and Waitress, but Gunicorn is widely used and easy to set up.
+
+To install and run Gunicorn:
 
 ```bash
 pip install gunicorn
-```
-
-Gunicorn is a program that can run our Flask application and handle multiple user requests efficiently. To start our application with Gunicorn, run:
-
-```bash
 gunicorn -w 4 -b 0.0.0.0:5000 app:app
 ```
 
-Let's break down this command:
-- `-w 4` tells Gunicorn to use 4 "worker" processes. Think of these as copies of our application that can handle requests simultaneously.
-- `-b 0.0.0.0:5000` tells Gunicorn to accept connections from any IP address on port 5000.
-- `app:app` points Gunicorn to our Flask application.
+Note: Make sure you're running this command from the directory containing your `app.py` file, and that your virtual environment is activated.
 
-If we were to skip using Gunicorn and just use Flask's built-in server, our application would still run, but it wouldn't be able to handle multiple requests efficiently. This could lead to slow response times or even crashes when multiple users try to access the site simultaneously. Gunicorn allows our application to serve many users at once, making it crucial for a production environment.
+This command tells Gunicorn to use 4 worker processes and accept connections from any IP address on port 5000.
 
 At this point, if your server's firewall allows it, you should be able to access your application by visiting your server's IP address in a web browser.
 
-### 5. Adding Nginx to the Mix
+### 5. Adding Nginx as a Reverse Proxy
 
-While Gunicorn is running our application, we can add another program called Nginx to make things even better. Nginx will act as a "front door" for our application, handling tasks like serving static files and managing HTTPS connections.
+While Gunicorn can serve our application, adding Nginx as a reverse proxy provides additional benefits:
+- Efficient handling of static files
+- Easier SSL/TLS configuration
+- Ability to serve multiple applications on the same server
+- Additional layer of security and load balancing
 
-Install Nginx:
+1. Install Nginx:
 
 ```bash
 sudo apt install nginx
 ```
 
-Now we need to tell Nginx about our application. Create a new configuration file:
+2. Remove the default Nginx configuration:
+
+```bash
+sudo rm /etc/nginx/sites-enabled/default
+```
+
+3. Create a new Nginx configuration file:
 
 ```bash
 sudo nano /etc/nginx/sites-available/water_reservoir_viz
 ```
 
-In this file, add the following configuration:
+4. Add the following configuration:
 
 ```nginx
 server {
@@ -183,49 +195,93 @@ server {
     server_name your_domain.com;
 
     location / {
-        proxy_pass http://127.0.0.1:5000;
+        proxy_pass http://127.0.0.1:5000;  # Your server's IP address
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
     }
 }
 ```
 
-This configuration tells Nginx to listen for incoming connections and forward them to our Gunicorn server.
+The `/etc/nginx/sites-available` directory contains configuration files for all potential Nginx virtual hosts. To actually enable a configuration, we need to link it to the `/etc/nginx/sites-enabled` directory, which Nginx reads from when it starts.
 
-To activate this configuration, create a link to it in the `sites-enabled` directory:
+5. Create this symbolic link to enable the site:
 
 ```bash
 sudo ln -s /etc/nginx/sites-available/water_reservoir_viz /etc/nginx/sites-enabled
 ```
 
-Check that our configuration doesn't have any errors:
+This approach allows for easy enabling or disabling of sites without duplicating configuration files.
+
+6. Check that our configuration doesn't have any errors:
 
 ```bash
 sudo nginx -t
 ```
 
-If everything looks good, restart Nginx to apply the changes:
+7. If everything looks good, restart Nginx to apply the changes:
 
 ```bash
 sudo systemctl restart nginx
 ```
 
-If we were to skip the Nginx setup, our application would still work through Gunicorn, but we'd miss out on several important benefits. Nginx is much more efficient at serving static files (like images or CSS) than Gunicorn, so without it, our application might be slower. Additionally, Nginx makes it easier to set up HTTPS for secure connections and can act as a buffer against certain types of cyber attacks. It also allows us to run multiple applications on the same server more easily.
-
 ### 6. Opening the Firewall
 
-Finally, we need to make sure the server's firewall allows traffic to reach Nginx:
+Finally, we need to configure the firewall to allow web traffic to reach our Nginx server. Ubuntu comes with a firewall configuration tool called UFW (Uncomplicated Firewall). We'll use it to open the necessary ports.
+
+Run the following command:
 
 ```bash
 sudo ufw allow 'Nginx Full'
 ```
 
-This command opens ports 80 (for HTTP) and 443 (for HTTPS) in the firewall.
+This command does the following:
+- It uses the predefined 'Nginx Full' profile in UFW.
+- This profile allows incoming traffic on both port 80 (HTTP) and port 443 (HTTPS).
+- It ensures that web users can access your site via both unsecured (HTTP) and secured (HTTPS) connections.
 
-If we skip this step, our application would be running, but it wouldn't be accessible from the internet. The firewall would block all incoming web traffic, essentially hiding our application from the world. This step is crucial for making our application publicly accessible.
+To verify that the firewall rule has been added correctly, you can check the status of UFW:
 
-Visit your server's IP address or domain name in a web browser to see it in action.
+```bash
+sudo ufw status
+```
 
+You should see output that includes these lines:
+
+```
+Nginx Full                  ALLOW       Anywhere
+Nginx Full (v6)             ALLOW       Anywhere (v6)
+```
+
+If you don't see these lines, or if you see that UFW is inactive, you may need to enable it:
+
+```bash
+sudo ufw enable
+```
+
+Remember, if UFW was not active before, enabling it might block other connections, so be sure you've set up rules for any other necessary services (like SSH) before enabling the firewall.
+
+If we skip this step, our Nginx server would be running, but it wouldn't be accessible from the internet. The firewall would block all incoming web traffic, essentially hiding our application from the world. This step is crucial for making our application publicly accessible while maintaining basic server security.
+
+### 7. Verifying the Setup
+
+After completing these steps, you should be able to access your application by entering your server's IP address (208.109.234.143) in a web browser or using curl:
+
+```bash
+curl http://208.109.234.143
+```
+
+This should now return the content of your Flask application instead of the Nginx welcome page.
+
+### Note on HTTPS
+
+Currently, HTTPS is not set up, which is why you're getting an error when trying to access the site via HTTPS. Setting up HTTPS involves obtaining and configuring SSL/TLS certificates. This is an important step for production environments, but it's beyond the scope of this basic setup.
+
+If you want to set up HTTPS in the future, you'll need to:
+1. Obtain an SSL/TLS certificate (e.g., using Let's Encrypt)
+2. Configure Nginx to use the certificate
+3. Update the Nginx configuration to listen on port 443 and redirect HTTP to HTTPS
+
+For now, your application will be accessible via HTTP on your IP address.
 
 ## Database Schema
 
@@ -301,45 +357,88 @@ def get_reservoir_data(clavesih):
 
 Remember to close your database connections after use to prevent resource leaks.
 
---------------------------------
+
+-------------------------------------------
+
 # Water Reservoir Visualization Project Configuration Guide
 
 [... previous sections remain unchanged ...]
 
-## Database Schema
+## Production Setup (Ubuntu Server)
 
-For those interested in the structure of our databases:
+[... steps 1-3 remain unchanged ...]
 
-### reservoir_static.db
-- Table: `reservoirs`
-  - `clavesih` (TEXT): Primary Key, unique identifier for each reservoir
-  - `nombreoficial` (TEXT): Official name of the reservoir
-  - `nombrecomun` (TEXT): Common name of the reservoir
-  - `estado` (TEXT): State where the reservoir is located
-  - `nommunicipio` (TEXT): Municipality name
-  - `regioncna` (TEXT): CNA region
-  - `latitud` (REAL): Latitude coordinate
-  - `longitud` (REAL): Longitude coordinate
-  - `uso` (TEXT): Usage of the reservoir
-  - `corriente` (TEXT): Water current
-  - `tipovertedor` (TEXT): Type of spillway
-  - `inicioop` (TEXT): Year of initial operation
-  - `elevcorona` (TEXT): Crown elevation
-  - `bordolibre` (REAL): Free board
-  - `nameelev` (REAL): Normal maximum water elevation
-  - `namealmac` (REAL): Normal maximum storage
-  - `namoelev` (REAL): Normal operating maximum elevation
-  - `namoalmac` (REAL): Normal operating maximum storage
-  - `alturacortina` (TEXT): Dam height
+### 4. Serving the Application
 
-### reservoir_dynamic.db
-- Table: `reservoir_data`
-  - `idmonitoreodiario` (INTEGER): Primary Key, unique identifier for each data point
-  - `clavesih` (TEXT): Foreign Key, references `reservoirs` table in `reservoir_static.db`
-  - `fechamonitoreo` (DATE): Date of the recorded data
-  - `elevacionactual` (REAL): Current water elevation
-  - `almacenaactual` (REAL): Current water storage amount
+For production, we'll use Gunicorn to serve our application. While Flask's built-in server is great for development, it's not suitable for production environments. Here's why:
 
-Note: The `llenano` field is not stored in either database, as it can be derived from other fields if needed.
+- Flask's server is single-threaded, handling only one request at a time. This can lead to slow response times under moderate traffic (as low as 10-30 requests per minute).
+- It lacks features needed for production, such as load balancing and process management.
 
-[... rest of the guide remains unchanged ...]
+Gunicorn, on the other hand, is a production-ready WSGI server that:
+- Supports multiple worker processes, handling concurrent requests efficiently.
+- Provides better resource management and fault tolerance.
+- Can significantly improve your application's ability to handle traffic, potentially managing hundreds of requests per minute, depending on your server's capacity and application complexity.
+
+There are alternatives to Gunicorn, such as uWSGI, mod_wsgi (for Apache), and Waitress, but Gunicorn is widely used and easy to set up.
+
+To install and run Gunicorn:
+
+```bash
+pip install gunicorn
+gunicorn -w 4 -b 0.0.0.0:5000 app:app
+```
+
+This command tells Gunicorn to use 4 worker processes and accept connections from any IP address on port 5000.
+
+### 5. Adding Nginx as a Reverse Proxy
+
+While Gunicorn can serve our application, adding Nginx as a reverse proxy provides additional benefits:
+- Efficient handling of static files
+- Easier SSL/TLS configuration
+- Ability to serve multiple applications on the same server
+- Additional layer of security and load balancing
+
+Install Nginx:
+
+```bash
+sudo apt install nginx
+```
+
+Create a new Nginx configuration file:
+
+```bash
+sudo nano /etc/nginx/sites-available/water_reservoir_viz
+```
+
+Add the following configuration:
+
+```nginx
+server {
+    listen 80;
+    server_name your_domain.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+The `/etc/nginx/sites-available` directory contains configuration files for all potential Nginx virtual hosts. To actually enable a configuration, we need to link it to the `/etc/nginx/sites-enabled` directory, which Nginx reads from when it starts.
+
+Create this symbolic link:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/water_reservoir_viz /etc/nginx/sites-enabled
+```
+
+This approach allows for easy enabling or disabling of sites without duplicating configuration files.
+
+Verify and restart Nginx:
+
+```bash
+sudo nginx -t
+sudo systemctl restart nginx
+```
