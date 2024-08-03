@@ -86,6 +86,7 @@ def main():
             
             if data_found:
                 days_with_data += 1
+                
             if api_called:
                 api_calls += 1
             days_processed += 1

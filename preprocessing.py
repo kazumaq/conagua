@@ -3,6 +3,9 @@ import sqlite3
 import os
 from datetime import datetime
 import sys
+import logging
+
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def create_and_fill_databases(input_directory):
     try:
@@ -22,13 +25,20 @@ def create_and_fill_databases(input_directory):
         if not json_files:
             raise ValueError(f"No JSON files found in {input_directory}")
 
-        latest_file = max(json_files, key=lambda x: os.path.getmtime(os.path.join(input_directory, x)))
+        logging.info(f"Found {len(json_files)} JSON files")
+        
+        # Sort files by date in the filename
+        sorted_files = sorted(json_files, key=lambda x: x.split('.')[0])
+        logging.info(f"Files will be processed in this order: {sorted_files}")
+
+        latest_file = sorted_files[-1]
+        logging.info(f"Latest file: {latest_file}")
 
         # Insert static data from the latest file
         process_static_data(os.path.join(input_directory, latest_file), static_cursor)
 
         # Process all files for dynamic data
-        for filename in json_files:
+        for filename in sorted_files:
             process_dynamic_data(os.path.join(input_directory, filename), dynamic_cursor)
 
         # Commit changes and close connections
@@ -37,13 +47,13 @@ def create_and_fill_databases(input_directory):
         static_conn.close()
         dynamic_conn.close()
 
-        print("Databases created and filled successfully.")
+        logging.info("Databases created and filled successfully.")
 
     except sqlite3.Error as e:
-        print(f"SQLite error occurred: {e}")
+        logging.error(f"SQLite error occurred: {e}")
         sys.exit(1)
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logging.error(f"An error occurred: {e}")
         sys.exit(1)
 
 def create_static_table(cursor):
@@ -70,18 +80,20 @@ def create_static_table(cursor):
         alturacortina TEXT
     )
     ''')
+    logging.info("Static table created or already exists")
 
 def create_dynamic_table(cursor):
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS reservoir_data (
-        idmonitoreodiario INTEGER PRIMARY KEY,
         clavesih TEXT,
         fechamonitoreo DATE,
         elevacionactual REAL,
         almacenaactual REAL,
+        PRIMARY KEY (clavesih, fechamonitoreo),
         FOREIGN KEY (clavesih) REFERENCES reservoirs(clavesih)
     )
     ''')
+    logging.info("Dynamic table created or already exists")
 
 def process_static_data(file_path, cursor):
     try:
@@ -119,15 +131,16 @@ def process_static_data(file_path, cursor):
                 item['namoalmac'],
                 item['alturacortina']
             ))
+        logging.info(f"Processed static data from {file_path}")
 
     except json.JSONDecodeError:
-        print(f"Error: Invalid JSON in file {file_path}")
+        logging.error(f"Error: Invalid JSON in file {file_path}")
         raise
     except KeyError as e:
-        print(f"Error: Missing key {e} in file {file_path}")
+        logging.error(f"Error: Missing key {e} in file {file_path}")
         raise
     except Exception as e:
-        print(f"Error processing static data from {file_path}: {e}")
+        logging.error(f"Error processing static data from {file_path}: {e}")
         raise
 
 def process_dynamic_data(file_path, cursor):
@@ -135,30 +148,68 @@ def process_dynamic_data(file_path, cursor):
         with open(file_path, 'r') as f:
             data = json.load(f)
         
+        logging.info(f"Processing file: {file_path}")
+        logging.info(f"Total records in file: {len(data)}")
+        
+        chapala_data = []
         for item in data:
+            if item['clavesih'] == 'LDCJL':
+                chapala_data.append(item)
             cursor.execute('''
             INSERT OR REPLACE INTO reservoir_data 
-            (idmonitoreodiario, clavesih, fechamonitoreo, elevacionactual, almacenaactual)
-            VALUES (?, ?, ?, ?, ?)
+            (clavesih, fechamonitoreo, elevacionactual, almacenaactual)
+            VALUES (?, ?, ?, ?)
             ''', (
-                item['idmonitoreodiario'],
                 item['clavesih'],
                 datetime.strptime(item['fechamonitoreo'], '%Y-%m-%d').date(),
                 item['elevacionactual'],
                 item['almacenaactual']
             ))
+        
+        logging.info(f"Inserted or updated {len(data)} records from {file_path}")
+        
+        if chapala_data:
+            logging.info(f"Lago de Chapala data in {file_path}:")
+            for item in chapala_data:
+                logging.info(f"Date: {item['fechamonitoreo']}, Elevation: {item['elevacionactual']}, Storage: {item['almacenaactual']}")
+        else:
+            logging.warning(f"No Lago de Chapala data found in {file_path}")
+
     except json.JSONDecodeError:
-        print(f"Error: Invalid JSON in file {file_path}")
+        logging.error(f"Error: Invalid JSON in file {file_path}")
         raise
     except KeyError as e:
-        print(f"Error: Missing key {e} in file {file_path}")
+        logging.error(f"Error: Missing key {e} in file {file_path}")
         raise
     except ValueError as e:
-        print(f"Error: Invalid date format in file {file_path}: {e}")
+        logging.error(f"Error: Invalid date format in file {file_path}: {e}")
         raise
     except Exception as e:
-        print(f"Error processing dynamic data from {file_path}: {e}")
+        logging.error(f"Error processing dynamic data from {file_path}: {e}")
         raise
+
+def verify_database_contents():
+    try:
+        conn = sqlite3.connect('reservoir_dynamic.db')
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT COUNT(*) FROM reservoir_data")
+        total_records = cursor.fetchone()[0]
+        logging.info(f"Total records in reservoir_data: {total_records}")
+
+        cursor.execute("SELECT COUNT(*) FROM reservoir_data WHERE clavesih = 'LDCJL'")
+        chapala_records = cursor.fetchone()[0]
+        logging.info(f"Total records for Lago de Chapala: {chapala_records}")
+
+        cursor.execute("SELECT fechamonitoreo, elevacionactual, almacenaactual FROM reservoir_data WHERE clavesih = 'LDCJL' ORDER BY fechamonitoreo DESC LIMIT 10")
+        latest_chapala_data = cursor.fetchall()
+        logging.info("Latest 10 records for Lago de Chapala:")
+        for record in latest_chapala_data:
+            logging.info(f"Date: {record[0]}, Elevation: {record[1]}, Storage: {record[2]}")
+
+        conn.close()
+    except sqlite3.Error as e:
+        logging.error(f"Error verifying database contents: {e}")
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
@@ -167,7 +218,8 @@ if __name__ == "__main__":
     
     input_directory = sys.argv[1]
     if not os.path.isdir(input_directory):
-        print(f"Error: {input_directory} is not a valid directory")
+        logging.error(f"Error: {input_directory} is not a valid directory")
         sys.exit(1)
 
     create_and_fill_databases(input_directory)
+    verify_database_contents()
