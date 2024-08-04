@@ -4,29 +4,6 @@
 
 Welcome to the Water Reservoir Visualization project! This web application visualizes data about water reservoirs in Mexico, providing insights into water levels, storage capacity, and other key metrics.
 
-## Project Structure
-
-Our project is organized like this:
-
-```
-water_reservoir_viz/
-│
-├── dam_data/
-│   └── (your raw JSON files here)
-│
-├── static/
-│   ├── index.html
-│   └── app.js
-│
-├── preprocessor.py
-├── app.py
-├── reservoir_static.db
-├── reservoir_dynamic.db
-└── requirements.in
-```
-
-This structure keeps our raw data, processed data (in SQLite databases), backend code, and frontend assets neatly separated.
-
 ## Local Setup
 
 Follow these steps to set up the project on your local machine for development:
@@ -36,8 +13,8 @@ Follow these steps to set up the project on your local machine for development:
 Open your terminal and run:
 
 ```bash
-python3 -m venv venv
-source venv/bin/activate
+python3 -m venv myenv
+source myenv/bin/activate
 ```
 
 You'll notice your terminal prompt change, indicating that the virtual environment is active. Any Python packages we install now will be confined to this project.
@@ -69,7 +46,7 @@ Before we start our application, we need to prepare our data. Our `preprocessor.
 Ensure all your raw JSON data files are in the `dam_data` directory, then run:
 
 ```bash
-python preprocessor.py dam_data
+python preprocessing.py dam_data
 ```
 
 The script processes all JSON files in the specified directory and will create two SQLite database files in your project root directory:
