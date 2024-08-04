@@ -7,10 +7,86 @@ const defaultReservoir = 'LDCJL'; // Lago de Chapala
 let fullStartDate, fullEndDate;
 let currentData;
 
+// Translations
+const translations = {
+    en: {
+        title: "Water Reservoir Visualization",
+        fullRange: "Show Full Range",
+        latestData: "Latest Data",
+        currentVolume: "Current Volume",
+        percentageFull: "Percentage Full",
+        volume: "Volume",
+        percentage: "Percentage",
+        cubicHectometers: "hm³",
+        startDate: "Start Date",
+        endDate: "End Date",
+        errorFetchingStates: "Failed to fetch states. Please check the console for more information.",
+        errorFetchingReservoirs: "Error fetching reservoirs",
+        errorLoadingReservoirData: "Error loading reservoir data",
+        noCurrentData: "No current data available",
+        latestDataElementNotFound: "latestData element not found in the DOM",
+        language: "Language",
+        state: "State",
+        reservoir: "Reservoir"
+    },
+    es: {
+        title: "Visualización de Embalses de Agua",
+        fullRange: "Mostrar Rango Completo",
+        latestData: "Datos más Recientes",
+        currentVolume: "Volumen Actual",
+        percentageFull: "Porcentaje Lleno",
+        volume: "Volumen",
+        percentage: "Porcentaje",
+        cubicHectometers: "hm³",
+        startDate: "Fecha de Inicio",
+        endDate: "Fecha de Fin",
+        errorFetchingStates: "Error al obtener estados. Por favor, revise la consola para más información.",
+        errorFetchingReservoirs: "Error al obtener embalses",
+        errorLoadingReservoirData: "Error al cargar datos del embalse",
+        noCurrentData: "No hay datos actuales disponibles",
+        latestDataElementNotFound: "Elemento latestData no encontrado en el DOM",
+        language: "Idioma",
+        state: "Estado",
+        reservoir: "Embalse"
+    }
+};
+
+let currentLanguage = 'en';
+
+// Function to change language
+function changeLanguage(lang) {
+    currentLanguage = lang;
+    document.querySelectorAll('[data-translate]').forEach(element => {
+        const key = element.getAttribute('data-translate');
+        element.textContent = translations[lang][key];
+    });
+    if (chart) {
+        updateChartLanguage();
+    }
+    if (currentData) {
+        displayLatestData(currentData[currentData.length - 1]);
+    }
+    // Update placeholders and labels for date inputs
+    document.getElementById('startDate').placeholder = translations[lang].startDate;
+    document.getElementById('endDate').placeholder = translations[lang].endDate;
+}
+
+// Function to update chart language
+function updateChartLanguage() {
+    if (chart) {
+        chart.data.datasets[0].label = `${translations[currentLanguage].volume} (${translations[currentLanguage].cubicHectometers})`;
+        chart.data.datasets[1].label = `${translations[currentLanguage].percentage} (%)`;
+        chart.options.scales['y-axis-1'].title.text = `${translations[currentLanguage].volume} (${translations[currentLanguage].cubicHectometers})`;
+        chart.options.scales['y-axis-2'].title.text = `${translations[currentLanguage].percentage} (%)`;
+        chart.update();
+    }
+}
+
 // Initialize the application
 function init() {
     console.log("Initializing application...");
     fetchStates();
+    document.getElementById('languageSelect').addEventListener('change', (e) => changeLanguage(e.target.value));
 }
 
 // Fetch list of states
@@ -28,7 +104,7 @@ function fetchStates() {
         })
         .catch(error => {
             console.error('Error fetching states:', error);
-            alert('Failed to fetch states. Please check the console for more information.');
+            alert(translations[currentLanguage].errorFetchingStates);
         });
 }
 
@@ -43,7 +119,7 @@ function fetchReservoirs(state) {
             loadReservoirData(defaultReservoir);
         })
         .catch(error => {
-            console.error('Error fetching reservoirs:', error);
+            console.error(translations[currentLanguage].errorFetchingReservoirs, error);
         });
 }
 
@@ -58,7 +134,7 @@ function loadReservoirData(clavesih) {
             processReservoirData(data);
         })
         .catch(error => {
-            console.error('Error loading reservoir data:', error);
+            console.error(translations[currentLanguage].errorLoadingReservoirData, error);
         });
 }
 
@@ -97,78 +173,86 @@ function processReservoirData(data) {
     displayLatestData(data[data.length - 1]);
 }
 
-// Update the chart with new data
-function updateChart(data) {
-    console.log(`Updating chart with ${data.length} data points`);
+// Create or update the chart
+function createOrUpdateChart(data) {
+    const ctx = document.getElementById('reservoirChart');
+    if (!ctx) {
+        console.error("Canvas element 'reservoirChart' not found");
+        return;
+    }
+
     const dates = data.map(d => d.fechamonitoreo);
     const volumes = data.map(d => d.almacenaactual);
     const percentages = data.map(d => d.llenano * 100);
 
     if (chart) {
-        chart.destroy();
-    }
-
-    const ctx = document.getElementById('reservoirChart').getContext('2d');
-    if (!ctx) {
-        console.error("Canvas context not found");
-        return;
-    }
-
-    chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: dates,
-            datasets: [
-                {
-                    label: 'Volume (hm³)',
-                    data: volumes,
-                    borderColor: 'rgb(75, 192, 192)',
-                    yAxisID: 'y-axis-1',
-                },
-                {
-                    label: 'Percentage (%)',
-                    data: percentages,
-                    borderColor: 'rgb(255, 99, 132)',
-                    yAxisID: 'y-axis-2',
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            scales: {
-                x: {
-                    type: 'time',
-                    time: {
-                        unit: 'month'
-                    }
-                },
-                'y-axis-1': {
-                    type: 'linear',
-                    display: true,
-                    position: 'left',
-                    title: {
-                        display: true,
-                        text: 'Volume (hm³)'
-                    }
-                },
-                'y-axis-2': {
-                    type: 'linear',
-                    display: true,
-                    position: 'right',
-                    title: {
-                        display: true,
-                        text: 'Percentage (%)'
+        chart.data.labels = dates;
+        chart.data.datasets[0].data = volumes;
+        chart.data.datasets[1].data = percentages;
+        chart.update();
+    } else {
+        chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: dates,
+                datasets: [
+                    {
+                        label: `${translations[currentLanguage].volume} (${translations[currentLanguage].cubicHectometers})`,
+                        data: volumes,
+                        borderColor: 'rgb(75, 192, 192)',
+                        yAxisID: 'y-axis-1',
                     },
-                    min: 0,
-                    max: Math.max(100, Math.ceil(Math.max(...percentages))),
-                    grid: {
-                        drawOnChartArea: false
+                    {
+                        label: `${translations[currentLanguage].percentage} (%)`,
+                        data: percentages,
+                        borderColor: 'rgb(255, 99, 132)',
+                        yAxisID: 'y-axis-2',
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: 'month'
+                        }
+                    },
+                    'y-axis-1': {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: `${translations[currentLanguage].volume} (${translations[currentLanguage].cubicHectometers})`
+                        }
+                    },
+                    'y-axis-2': {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: `${translations[currentLanguage].percentage} (%)`
+                        },
+                        min: 0,
+                        max: Math.max(100, Math.ceil(Math.max(...percentages))),
+                        grid: {
+                            drawOnChartArea: false
+                        }
                     }
                 }
             }
-        }
-    });
-    console.log("Chart updated successfully");
+        });
+    }
+    console.log("Chart created or updated successfully");
+}
+
+// Update the chart with new data
+function updateChart(data) {
+    console.log(`Updating chart with ${data.length} data points`);
+    createOrUpdateChart(data);
 }
 
 // Display latest data
@@ -176,13 +260,13 @@ function displayLatestData(data) {
     console.log(`Displaying latest data: ${JSON.stringify(data)}`);
     const latestDataDiv = document.getElementById('latestData');
     if (!latestDataDiv) {
-        console.error("latestData element not found in the DOM");
+        console.error(translations[currentLanguage].latestDataElementNotFound);
         return;
     }
     latestDataDiv.innerHTML = `
-        <h3>Latest Data (${data.fechamonitoreo})</h3>
-        <p>Current Volume: ${data.almacenaactual.toFixed(2)} hm³</p>
-        <p>Percentage Full: ${(data.llenano * 100).toFixed(2)}%</p>
+        <h3>${translations[currentLanguage].latestData} (${data.fechamonitoreo})</h3>
+        <p>${translations[currentLanguage].currentVolume}: ${data.almacenaactual.toFixed(2)} ${translations[currentLanguage].cubicHectometers}</p>
+        <p>${translations[currentLanguage].percentageFull}: ${(data.llenano * 100).toFixed(2)}%</p>
     `;
 }
 
@@ -224,7 +308,7 @@ function updateDataRange() {
         console.log(`Filtered ${filteredData.length} data points`);
         updateChart(filteredData);
     } else {
-        console.error("No current data available");
+        console.error(translations[currentLanguage].noCurrentData);
     }
 }
 
@@ -243,6 +327,12 @@ document.addEventListener('DOMContentLoaded', () => {
         updateDataRange();
     });
 
+    // Set initial placeholders for date inputs
+    document.getElementById('startDate').placeholder = translations[currentLanguage].startDate;
+    document.getElementById('endDate').placeholder = translations[currentLanguage].endDate;
+
     // Initialize the application
     init();
 });
+
+// -------------------------

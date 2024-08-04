@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Water Reservoir Visualization</title>
+    <title data-translate="title">Water Reservoir Visualization</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <style>
@@ -35,17 +35,41 @@
             margin-top: 20px;
             text-align: center;
         }
+        label {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
     </style>
 </head>
 <body>
-    <h1>Water Reservoir Visualization</h1>
+    <h1 data-translate="title">Water Reservoir Visualization</h1>
     
     <div class="controls">
-        <select id="stateSelect"></select>
-        <select id="reservoirSelect"></select>
-        <input type="date" id="startDate">
-        <input type="date" id="endDate">
-        <button id="fullRangeButton">Show Full Range</button>
+        <label>
+            <span data-translate="language">Language</span>
+            <select id="languageSelect">
+                <option value="en">English</option>
+                <option value="es">Español</option>
+            </select>
+        </label>
+        <label>
+            <span data-translate="state">State</span>
+            <select id="stateSelect"></select>
+        </label>
+        <label>
+            <span data-translate="reservoir">Reservoir</span>
+            <select id="reservoirSelect"></select>
+        </label>
+        <label>
+            <span data-translate="startDate">Start Date</span>
+            <input type="date" id="startDate">
+        </label>
+        <label>
+            <span data-translate="endDate">End Date</span>
+            <input type="date" id="endDate">
+        </label>
+        <button id="fullRangeButton" data-translate="fullRange">Show Full Range</button>
     </div>
 
     <canvas id="reservoirChart"></canvas>
