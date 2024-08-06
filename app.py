@@ -16,9 +16,9 @@ def get_db_connection(db_name):
         app.logger.error(f"Database connection error: {e}")
         return None
 
-@app.route('/')
+@app.route('/embalses/niveles')
 def index():
-    return send_from_directory(app.static_folder, 'index.html')
+    return send_from_directory(app.static_folder, 'embalses_main.html')
 
 @app.route('/api/states')
 def get_states():
