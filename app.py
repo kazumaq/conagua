@@ -1,10 +1,10 @@
-from flask import Flask, jsonify, send_from_directory, request
+from flask import Flask, jsonify, send_from_directory, render_template, request
 import sqlite3
 from datetime import datetime, timedelta
 import os
 import logging
 
-app = Flask(__name__, static_folder='static')
+app = Flask(__name__, static_folder='static', template_folder='templates')
 logging.basicConfig(level=logging.DEBUG)
 
 def get_db_connection(db_name):
@@ -16,9 +16,23 @@ def get_db_connection(db_name):
         app.logger.error(f"Database connection error: {e}")
         return None
 
+@app.route('/')
+def main_page():
+    return send_from_directory('static_pages', 'index.html')
+
+@app.route('/embalses')
+def embalses_main():
+    return send_from_directory('static_pages', 'embalses_main.html')
+
 @app.route('/embalses/niveles')
-def index():
-    return send_from_directory(app.static_folder, 'embalses_main.html')
+def embalses_niveles():
+    # Your existing code for showing reservoir levels
+    return render_template('embalses_niveles.html')
+
+@app.route('/embalses/simulacion')
+def embalses_simulacion():
+    # This function will handle the logic for your simulation page
+    return render_template('embalses_simulacion.html')
 
 @app.route('/api/states')
 def get_states():
@@ -107,4 +121,4 @@ def get_latest_data(clavesih):
     return jsonify(result)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
