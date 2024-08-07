@@ -183,7 +183,7 @@ function createOrUpdateChart(data) {
 
     const dates = data.map(d => d.fechamonitoreo);
     const volumes = data.map(d => d.almacenaactual);
-    const percentages = data.map(d => d.llenano * 100);
+    const percentages = data.map(d => d.fill_percentage);
 
     if (chart) {
         chart.data.labels = dates;
@@ -266,7 +266,7 @@ function displayLatestData(data) {
     latestDataDiv.innerHTML = `
         <h3>${translations[currentLanguage].latestData} (${data.fechamonitoreo})</h3>
         <p>${translations[currentLanguage].currentVolume}: ${data.almacenaactual.toFixed(2)} ${translations[currentLanguage].cubicHectometers}</p>
-        <p>${translations[currentLanguage].percentageFull}: ${(data.llenano * 100).toFixed(2)}%</p>
+        <p>${translations[currentLanguage].percentageFull}: ${(data.fill_percentage).toFixed(2)}%</p>
     `;
 }
 

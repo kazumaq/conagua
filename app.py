@@ -79,23 +79,46 @@ def get_reservoir_info(clavesih):
         return jsonify({'error': 'Reservoir not found'}), 404
     return jsonify(dict(reservoir))
 
+def calculate_fill_percentage(almacenaactual, namoalmac):
+    if namoalmac == 0:
+        return 0  # Avoid division by zero
+    return (almacenaactual / namoalmac) * 100
+
 @app.route('/api/data/<clavesih>')
 def get_reservoir_data(clavesih):
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
 
-    conn = get_db_connection('reservoir_dynamic.db')
-    query = 'SELECT * FROM reservoir_data WHERE clavesih = ? ORDER BY fechamonitoreo'
-    params = [clavesih]
+    # Connect to both databases
+    dynamic_conn = get_db_connection('reservoir_dynamic.db')
+    static_conn = get_db_connection('reservoir_static.db')
 
-    if start_date and end_date:
-        query += ' AND fechamonitoreo BETWEEN ? AND ?'
-        params.extend([start_date, end_date])
+    # Query dynamic data
+    dynamic_query = '''
+        SELECT * FROM reservoir_data 
+        WHERE clavesih = ? AND fechamonitoreo BETWEEN ? AND ? 
+        ORDER BY fechamonitoreo
+    '''
+    dynamic_data = dynamic_conn.execute(dynamic_query, (clavesih, start_date, end_date)).fetchall()
 
-    data = conn.execute(query, params).fetchall()
-    conn.close()
+    # Query static data
+    static_query = 'SELECT * FROM reservoirs WHERE clavesih = ?'
+    static_data = static_conn.execute(static_query, (clavesih,)).fetchone()
 
-    result = [dict(row) for row in data]
+    # Close connections
+    dynamic_conn.close()
+    static_conn.close()
+
+    # Combine dynamic and static data
+    result = []
+    for row in dynamic_data:
+        data_point = dict(row)
+        if static_data:
+            data_point.update(dict(static_data))
+            # Calculate fill percentage
+            data_point['fill_percentage'] = calculate_fill_percentage(data_point['almacenaactual'], data_point['namoalmac'])
+        result.append(data_point)
+
     app.logger.info(f"Retrieved {len(result)} data points for reservoir {clavesih}")
     if result:
         app.logger.debug(f"Date range: {result[0]['fechamonitoreo']} to {result[-1]['fechamonitoreo']}")
@@ -104,21 +127,33 @@ def get_reservoir_data(clavesih):
 
 @app.route('/api/latest/<clavesih>')
 def get_latest_data(clavesih):
-    conn = get_db_connection('reservoir_dynamic.db')
-    latest = conn.execute('''
+    dynamic_conn = get_db_connection('reservoir_dynamic.db')
+    static_conn = get_db_connection('reservoir_static.db')
+
+    latest = dynamic_conn.execute('''
         SELECT * FROM reservoir_data 
         WHERE clavesih = ?
         ORDER BY fechamonitoreo DESC
         LIMIT 1
     ''', (clavesih,)).fetchone()
-    conn.close()
+
+    static_data = static_conn.execute('SELECT * FROM reservoirs WHERE clavesih = ?', (clavesih,)).fetchone()
+
+    dynamic_conn.close()
+    static_conn.close()
 
     if latest is None:
         return jsonify({'error': 'No data found for this reservoir'}), 404
     
     result = dict(latest)
+    if static_data:
+        result.update(dict(static_data))
+        # Calculate fill percentage
+        result['fill_percentage'] = calculate_fill_percentage(result['almacenaactual'], result['namoalmac'])
+    
     app.logger.info(f"Latest data for reservoir {clavesih}: {result}")
     return jsonify(result)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
+

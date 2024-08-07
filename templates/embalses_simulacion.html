@@ -4,6 +4,63 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Simulación de Cuencas</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        select, input, button {
+            padding: 5px;
+            font-size: 16px;
+        }
+        #visualization {
+            width: 100%;
+            max-width: 1200px;
+            height: 600px;
+            border: 1px solid #ccc;
+            position: relative;
+        }
+        .reservoir {
+            position: absolute;
+            width: 100px;
+            height: 60px;
+            background-color: #3498db;
+            border: 2px solid #2980b9;
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 12px;
+            color: white;
+            transition: all 0.5s ease;
+        }
+        .reservoir-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .reservoir-level {
+            font-size: 10px;
+        }
+        .flow {
+            position: absolute;
+            background-color: #3498db;
+            transition: all 0.5s ease;
+        }
+    </style>
 </head>
 
 <!-- Google tag (gtag.js) -->
@@ -20,5 +77,229 @@
     <h1>Simulación de Cuencas</h1>
     <p>Esta página está en desarrollo. Próximamente encontrarás aquí una herramienta para simular niveles de embalses en cuencas específicas.</p>
     <a href="{{ url_for('embalses_main') }}">Volver a la página principal de Embalses</a>
+
+    <h1>Advanced Watershed Visualization</h1>
+    
+    <div id="controls">
+        <label>
+            Start Date:
+            <input type="date" id="startDate">
+        </label>
+        <label>
+            End Date:
+            <input type="date" id="endDate">
+        </label>
+        <button id="simulateBtn">Simulate</button>
+        <label>
+            Animation Speed:
+            <input type="range" id="animationSpeed" min="1" max="10" value="5">
+        </label>
+    </div>
+
+    <div class="date-display">
+        Current Date: <span id="current-date"></span>
+    </div>
+
+    <div id="visualization"></div>
+
+    <script>
+        // Single source of truth for reservoir IDs
+        const RESERVOIR_IDS = {
+            JOSE_A_ALZATE: 'SBBMX',
+            IGNACIO_RAMIREZ: 'PIRMX',
+            TEPUXTEPEC: 'TEPMC',
+            JOSE_FABELA: 'PFBMX',
+            TERCER_MUNDO: 'TMUMC',
+            SOLIS: 'SLSGJ',
+            TEPETITLAN: 'TPTMX',
+            LAS_ADJUNTAS: 'VGRTP',
+            // TRES_GUERRAS_CELAYA: 'TGUCE', // Not found in the provided data, keeping original
+            PENUELAS: 'PNLGJ',
+            IGNACIO_ALLENDE: 'IALGJ',
+            COINTZIO: 'COIMC',
+            LAGUNA_DE_YURIRIA: 'LDYGJ',
+            LA_SOLEDAD: 'PRSGJ',
+            LA_PURISIMA: 'PRSGJ',
+            // SALAMANCA: 'SDLMD', // Not found in the provided data, keeping original
+            EL_PALOTE: 'EPLGJ',
+            LA_GOLONDRINA: 'GLNGJ',
+            // MARKAZUZA: 'MRKZB', // Not found in the provided data, keeping original
+            MARIANO_ABASOLO: 'MABGJ',
+            // CORRALES: 'CORRC', // Not found in the provided data, keeping original
+            LAGUNA_DE_FRESNO: 'LDFMC',
+            LA_POLVORA: 'POLJL',
+            // YURECUARO: 'VURRO', // Not found in the provided data, keeping original
+            // LA_BARCA: 'BARCA', // Not found in the provided data, keeping original
+            DE_GONZALO: 'DGNMC',
+            UREPETIRO: 'UREMC',
+            GUARACHA: 'GUAMC',
+            JARIPO: 'JARMC',
+            COPANDARO: 'CPAMC',
+            LAGO_DE_CHAPALA: 'LDCJL'
+        };
+
+        const reservoirs = [
+            { id: RESERVOIR_IDS.JOSE_A_ALZATE, name: 'José A. Alzate', x: 50, y: 50 },
+            { id: RESERVOIR_IDS.IGNACIO_RAMIREZ, name: 'Ignacio Ramírez', x: 50, y: 120 },
+            { id: RESERVOIR_IDS.TEPUXTEPEC, name: 'Tepuxtepec', x: 200, y: 50 },
+            { id: RESERVOIR_IDS.JOSE_FABELA, name: 'José Fabela', x: 50, y: 190 },
+            { id: RESERVOIR_IDS.TERCER_MUNDO, name: 'Tercer Mundo', x: 200, y: 120 },
+            { id: RESERVOIR_IDS.SOLIS, name: 'Solís', x: 350, y: 50 },
+            { id: RESERVOIR_IDS.TEPETITLAN, name: 'Tepetitlán', x: 50, y: 260 },
+            { id: RESERVOIR_IDS.LAS_ADJUNTAS, name: 'Las Adjuntas', x: 200, y: 190 },
+            { id: RESERVOIR_IDS.PENUELAS, name: 'Peñuelitas', x: 50, y: 330 },
+            { id: RESERVOIR_IDS.IGNACIO_ALLENDE, name: 'Ignacio Allende', x: 200, y: 260 },
+            { id: RESERVOIR_IDS.COINTZIO, name: 'Cointzio', x: 50, y: 400 },
+            { id: RESERVOIR_IDS.LAGUNA_DE_YURIRIA, name: 'Laguna de Yuriria', x: 350, y: 190 },
+            { id: RESERVOIR_IDS.LA_SOLEDAD, name: 'La Soledad', x: 200, y: 330 },
+            { id: RESERVOIR_IDS.LA_PURISIMA, name: 'La Purísima', x: 350, y: 260 },
+            { id: RESERVOIR_IDS.EL_PALOTE, name: 'El Palote', x: 500, y: 190 },
+            { id: RESERVOIR_IDS.LA_GOLONDRINA, name: 'La Golondrina', x: 500, y: 260 },
+            { id: RESERVOIR_IDS.MARIANO_ABASOLO, name: 'Mariano Abasolo', x: 650, y: 190 },
+            { id: RESERVOIR_IDS.LAGUNA_DE_FRESNO, name: 'Laguna de Fresno', x: 650, y: 330 },
+            { id: RESERVOIR_IDS.LA_POLVORA, name: 'La Pólvora', x: 800, y: 190 },
+            { id: RESERVOIR_IDS.DE_GONZALO, name: 'De Gonzalo', x: 950, y: 260 },
+            { id: RESERVOIR_IDS.UREPETIRO, name: 'Urepetiro', x: 950, y: 330 },
+            { id: RESERVOIR_IDS.GUARACHA, name: 'Guaracha', x: 950, y: 400 },
+            { id: RESERVOIR_IDS.JARIPO, name: 'Jaripo', x: 950, y: 470 },
+            { id: RESERVOIR_IDS.COPANDARO, name: 'Copandaro', x: 950, y: 540 },
+            { id: RESERVOIR_IDS.LAGO_DE_CHAPALA, name: 'Lago de Chapala', x: 1100, y: 330 }
+        ];
+
+        const flows = [
+            { from: RESERVOIR_IDS.JOSE_A_ALZATE, to: RESERVOIR_IDS.IGNACIO_RAMIREZ },
+            { from: RESERVOIR_IDS.IGNACIO_RAMIREZ, to: RESERVOIR_IDS.TEPUXTEPEC },
+            { from: RESERVOIR_IDS.JOSE_FABELA, to: RESERVOIR_IDS.TEPUXTEPEC },
+            { from: RESERVOIR_IDS.TEPUXTEPEC, to: RESERVOIR_IDS.TERCER_MUNDO },
+            { from: RESERVOIR_IDS.TERCER_MUNDO, to: RESERVOIR_IDS.SOLIS },
+            { from: RESERVOIR_IDS.TEPETITLAN, to: RESERVOIR_IDS.LAS_ADJUNTAS },
+            { from: RESERVOIR_IDS.LAS_ADJUNTAS, to: RESERVOIR_IDS.EL_PALOTE },
+            { from: RESERVOIR_IDS.PENUELAS, to: RESERVOIR_IDS.IGNACIO_ALLENDE },
+            { from: RESERVOIR_IDS.COINTZIO, to: RESERVOIR_IDS.LAGUNA_DE_YURIRIA },
+            { from: RESERVOIR_IDS.IGNACIO_ALLENDE, to: RESERVOIR_IDS.LA_SOLEDAD },
+            { from: RESERVOIR_IDS.LA_SOLEDAD, to: RESERVOIR_IDS.LA_PURISIMA },
+            { from: RESERVOIR_IDS.LAGUNA_DE_YURIRIA, to: RESERVOIR_IDS.LA_PURISIMA },
+            { from: RESERVOIR_IDS.SOLIS, to: RESERVOIR_IDS.EL_PALOTE },
+            { from: RESERVOIR_IDS.LA_PURISIMA, to: RESERVOIR_IDS.EL_PALOTE },
+            { from: RESERVOIR_IDS.EL_PALOTE, to: RESERVOIR_IDS.LA_GOLONDRINA },
+            { from: RESERVOIR_IDS.LA_GOLONDRINA, to: RESERVOIR_IDS.MARIANO_ABASOLO },
+            { from: RESERVOIR_IDS.MARIANO_ABASOLO, to: RESERVOIR_IDS.LAGUNA_DE_FRESNO },
+            { from: RESERVOIR_IDS.MARIANO_ABASOLO, to: RESERVOIR_IDS.LA_POLVORA },
+            { from: RESERVOIR_IDS.LA_POLVORA, to: RESERVOIR_IDS.LAGO_DE_CHAPALA },
+            { from: RESERVOIR_IDS.DE_GONZALO, to: RESERVOIR_IDS.LAGO_DE_CHAPALA },
+            { from: RESERVOIR_IDS.UREPETIRO, to: RESERVOIR_IDS.LAGO_DE_CHAPALA },
+            { from: RESERVOIR_IDS.GUARACHA, to: RESERVOIR_IDS.LAGO_DE_CHAPALA },
+            { from: RESERVOIR_IDS.JARIPO, to: RESERVOIR_IDS.LAGO_DE_CHAPALA },
+            { from: RESERVOIR_IDS.COPANDARO, to: RESERVOIR_IDS.LAGO_DE_CHAPALA }
+        ];
+
+        let currentData = {};
+        let animationInterval;
+
+        function createVisualization() {
+            const container = document.getElementById('visualization');
+            container.innerHTML = '';
+
+            reservoirs.forEach(reservoir => {
+                const div = document.createElement('div');
+                div.className = 'reservoir';
+                div.id = reservoir.id;
+                div.style.left = `${reservoir.x}px`;
+                div.style.top = `${reservoir.y}px`;
+                div.innerHTML = `
+                    <div class="reservoir-name">${reservoir.name}</div>
+                    <div class="reservoir-level">Level: 0%</div>
+                `;
+                container.appendChild(div);
+            });
+
+            flows.forEach(flow => {
+                const fromReservoir = reservoirs.find(r => r.id === flow.from);
+                const toReservoir = reservoirs.find(r => r.id === flow.to);
+                if (fromReservoir && toReservoir) {
+                    const flowDiv = document.createElement('div');
+                    flowDiv.className = 'flow';
+                    const angle = Math.atan2(toReservoir.y - fromReservoir.y, toReservoir.x - fromReservoir.x);
+                    const length = Math.sqrt(Math.pow(toReservoir.x - fromReservoir.x, 2) + Math.pow(toReservoir.y - fromReservoir.y, 2));
+                    flowDiv.style.width = `${length}px`;
+                    flowDiv.style.height = '2px';
+                    flowDiv.style.left = `${fromReservoir.x + 50}px`;
+                    flowDiv.style.top = `${fromReservoir.y + 30}px`;
+                    flowDiv.style.transform = `rotate(${angle}rad)`;
+                    flowDiv.style.transformOrigin = 'left center';
+                    container.appendChild(flowDiv);
+                }
+            });
+        }
+
+        function updateVisualization(data) {
+            Object.entries(data).forEach(([id, reservoirData]) => {
+                const div = document.getElementById(id);
+                if (div && reservoirData) {
+                    const level = reservoirData.fill_percentage;
+                    div.style.height = `${Math.max(60 * level / 100, 20)}px`;
+                    div.querySelector('.reservoir-level').textContent = `Level: ${level.toFixed(2)}%`;
+                }
+            });
+        }
+
+        async function fetchReservoirData(clavesih, startDate, endDate) {
+            const response = await fetch(`/api/data/${clavesih}?start_date=${startDate}&end_date=${endDate}`);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch data for reservoir ${clavesih}`);
+            }
+            return await response.json();
+        }
+
+        async function simulate() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const speed = document.getElementById('animationSpeed').value;
+
+            clearInterval(animationInterval);
+
+            try {
+                const allData = await Promise.all(reservoirs.map(reservoir => 
+                    fetchReservoirData(reservoir.id, startDate, endDate)
+                ));
+
+                const dataByDate = {};
+                allData.forEach((reservoirData, index) => {
+                    reservoirData.forEach(dataPoint => {
+                        if (!dataByDate[dataPoint.fechamonitoreo]) {
+                            dataByDate[dataPoint.fechamonitoreo] = {};
+                        }
+                        dataByDate[dataPoint.fechamonitoreo][reservoirs[index].id] = dataPoint;
+                    });
+                });
+
+                const dates = Object.keys(dataByDate).sort();
+                let dateIndex = 0;
+
+                animationInterval = setInterval(() => {
+                    if (dateIndex >= dates.length) {
+                        clearInterval(animationInterval);
+                        return;
+                    }
+
+                    const currentDate = dates[dateIndex];
+                    currentData = dataByDate[currentDate];
+                    updateVisualization(currentData);
+                    document.getElementById('current-date').textContent = currentDate;
+
+                    dateIndex++;
+                }, 1000 / speed);
+
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                alert('Error fetching reservoir data. Please try again.');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            createVisualization();
+            document.getElementById('simulateBtn').addEventListener('click', simulate);
+        });
+    </script>
 </body>
 </html>
