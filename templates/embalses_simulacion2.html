@@ -81,31 +81,45 @@
 
     <script>
         const width = 1500;
-        const height = 1000;
+        const height = 2000;
         const svg = d3.select("#visualization")
             .append("svg")
             .attr("width", width)
             .attr("height", height);
 
         // Add this new function after the svg declaration
+
         function calculatePositions(reservoirs, width, height) {
-            const margin = 50; // Margin from the edges of the SVG
-            const usableWidth = width - 2 * margin;
-            const usableHeight = height - 2 * margin;
-            
-            const minX = Math.min(...reservoirs.map(r => r.x));
-            const maxX = Math.max(...reservoirs.map(r => r.x));
-            const minY = Math.min(...reservoirs.map(r => r.y));
-            const maxY = Math.max(...reservoirs.map(r => r.y));
-            
-            const scaleX = usableWidth / (maxX - minX);
-            const scaleY = usableHeight / (maxY - minY);
-            
+            const margin = { top: 80, bottom: 50, left: 100, right: 100 }; // Increased top margin
+            const usableWidth = width - margin.left - margin.right;
+            const usableHeight = height - margin.top - margin.bottom;
+
+            // Group reservoirs by levels
+            const levels = {};
             reservoirs.forEach(reservoir => {
-                reservoir.x = margin + (reservoir.x - minX) * scaleX;
-                reservoir.y = margin + (reservoir.y - minY) * scaleY;
+                if (!levels[reservoir.level]) {
+                    levels[reservoir.level] = [];
+                }
+                levels[reservoir.level].push(reservoir);
             });
-            
+
+            const maxLevel = Math.max(...Object.keys(levels).map(Number));
+
+            // Calculate vertical spacing
+            // Use only 70% of usable height to create more separation
+            const levelHeight = (usableHeight * 0.7) / (maxLevel + 1);
+
+            // Position reservoirs
+            Object.entries(levels).forEach(([level, levelReservoirs]) => {
+                const y = margin.top + level * levelHeight;
+                const reservoirWidth = usableWidth / (levelReservoirs.length + 1);
+
+                levelReservoirs.forEach((reservoir, index) => {
+                    reservoir.x = margin.left + (index + 1) * reservoirWidth;
+                    reservoir.y = y;
+                });
+            });
+
             return reservoirs;
         }
 
@@ -145,32 +159,33 @@
         };
 
         // Sample data for reservoirs and rivers
-        reservoirs = [
-            { id: RESERVOIR_IDS.JOSE_A_ALZATE, x: 500, y: 50, level: 0.5, name: "José A. Alzate", capacity: 1000, normalLevel: 0.8, floodLevel: 0.95 },
-            { id: RESERVOIR_IDS.IGNACIO_RAMIREZ, x: 250, y: 150, level: 0.7, name: "Ignacio Ramírez", capacity: 500, normalLevel: 0.75, floodLevel: 0.9 },
-            { id: RESERVOIR_IDS.TEPUXTEPEC, x: 750, y: 150, level: 0.3, name: "Tepuxtepec", capacity: 750, normalLevel: 0.85, floodLevel: 0.98 },
-            { id: RESERVOIR_IDS.JOSE_FABELA, x: 125, y: 250, level: 0.6, name: "José Fabela", capacity: 250, normalLevel: 0.7, floodLevel: 0.88 },
-            { id: RESERVOIR_IDS.TERCER_MUNDO, x: 375, y: 250, level: 0.4, name: "Tercer Mundo", capacity: 300, normalLevel: 0.78, floodLevel: 0.93 },
-            { id: RESERVOIR_IDS.SOLIS, x: 625, y: 250, level: 0.8, name: "Solís", capacity: 600, normalLevel: 0.82, floodLevel: 0.96 },
-            { id: RESERVOIR_IDS.TEPETITLAN, x: 875, y: 250, level: 0.2, name: "Tepetitlán", capacity: 400, normalLevel: 0.88, floodLevel: 0.99 },
-            { id: RESERVOIR_IDS.LAS_ADJUNTAS, x: 200, y: 350, level: 0.55, name: "Las Adjuntas", capacity: 350, normalLevel: 0.76, floodLevel: 0.92 },
-            { id: RESERVOIR_IDS.PENUELAS, x: 450, y: 350, level: 0.65, name: "Peñuelas", capacity: 450, normalLevel: 0.79, floodLevel: 0.94 },
-            { id: RESERVOIR_IDS.IGNACIO_ALLENDE, x: 700, y: 350, level: 0.45, name: "Ignacio Allende", capacity: 550, normalLevel: 0.81, floodLevel: 0.97 },
-            { id: RESERVOIR_IDS.COINTZIO, x: 150, y: 450, level: 0.75, name: "Cointzio", capacity: 200, normalLevel: 0.72, floodLevel: 0.89 },
-            { id: RESERVOIR_IDS.LAGUNA_DE_YURIRIA, x: 400, y: 450, level: 0.35, name: "Laguna de Yuriria", capacity: 800, normalLevel: 0.86, floodLevel: 0.98 },
-            { id: RESERVOIR_IDS.LA_SOLEDAD, x: 650, y: 450, level: 0.85, name: "La Soledad", capacity: 150, normalLevel: 0.74, floodLevel: 0.91 },
-            { id: RESERVOIR_IDS.LA_PURISIMA, x: 900, y: 450, level: 0.25, name: "La Purísima", capacity: 700, normalLevel: 0.84, floodLevel: 0.96 },
-            { id: RESERVOIR_IDS.EL_PALOTE, x: 225, y: 550, level: 0.7, name: "El Palote", capacity: 320, normalLevel: 0.77, floodLevel: 0.93 },
-            { id: RESERVOIR_IDS.LA_GOLONDRINA, x: 475, y: 550, level: 0.5, name: "La Golondrina", capacity: 280, normalLevel: 0.75, floodLevel: 0.9 },
-            { id: RESERVOIR_IDS.MARIANO_ABASOLO, x: 725, y: 550, level: 0.6, name: "Mariano Abasolo", capacity: 380, normalLevel: 0.8, floodLevel: 0.95 },
-            { id: RESERVOIR_IDS.LAGUNA_DE_FRESNO, x: 300, y: 650, level: 0.4, name: "Laguna de Fresno", capacity: 420, normalLevel: 0.83, floodLevel: 0.97 },
-            { id: RESERVOIR_IDS.LA_POLVORA, x: 550, y: 650, level: 0.8, name: "La Pólvora", capacity: 180, normalLevel: 0.71, floodLevel: 0.87 },
-            { id: RESERVOIR_IDS.DE_GONZALO, x: 800, y: 650, level: 0.3, name: "De Gonzalo", capacity: 520, normalLevel: 0.82, floodLevel: 0.96 },
-            { id: RESERVOIR_IDS.UREPETIRO, x: 375, y: 750, level: 0.55, name: "Urepetiro", capacity: 230, normalLevel: 0.73, floodLevel: 0.89 },
-            { id: RESERVOIR_IDS.GUARACHA, x: 625, y: 750, level: 0.75, name: "Guaracha", capacity: 480, normalLevel: 0.79, floodLevel: 0.94 },
-            { id: RESERVOIR_IDS.JARIPO, x: 450, y: 850, level: 0.45, name: "Jaripo", capacity: 270, normalLevel: 0.76, floodLevel: 0.92 },
-            { id: RESERVOIR_IDS.COPANDARO, x: 700, y: 850, level: 0.65, name: "Copándaro", capacity: 340, normalLevel: 0.78, floodLevel: 0.93 },
-            { id: RESERVOIR_IDS.LAGO_DE_CHAPALA, x: 575, y: 950, level: 0.7, name: "Lago de Chapala", capacity: 1500, normalLevel: 0.85, floodLevel: 0.98 }
+
+        let reservoirs = [
+            { id: RESERVOIR_IDS.JOSE_A_ALZATE, level: 0, name: "José A. Alzate", capacity: 1000, normalLevel: 0.8, floodLevel: 0.95, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.IGNACIO_RAMIREZ, level: 1, name: "Ignacio Ramírez", capacity: 500, normalLevel: 0.75, floodLevel: 0.9, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.TEPUXTEPEC, level: 1, name: "Tepuxtepec", capacity: 750, normalLevel: 0.85, floodLevel: 0.98, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.JOSE_FABELA, level: 2, name: "José Fabela", capacity: 250, normalLevel: 0.7, floodLevel: 0.88, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.TERCER_MUNDO, level: 2, name: "Tercer Mundo", capacity: 300, normalLevel: 0.78, floodLevel: 0.93, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.SOLIS, level: 2, name: "Solís", capacity: 600, normalLevel: 0.82, floodLevel: 0.96, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.TEPETITLAN, level: 2, name: "Tepetitlán", capacity: 400, normalLevel: 0.88, floodLevel: 0.99, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.LAS_ADJUNTAS, level: 3, name: "Las Adjuntas", capacity: 350, normalLevel: 0.76, floodLevel: 0.92, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.PENUELAS, level: 3, name: "Peñuelas", capacity: 450, normalLevel: 0.79, floodLevel: 0.94, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.IGNACIO_ALLENDE, level: 3, name: "Ignacio Allende", capacity: 550, normalLevel: 0.81, floodLevel: 0.97, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.COINTZIO, level: 4, name: "Cointzio", capacity: 200, normalLevel: 0.72, floodLevel: 0.89, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.LAGUNA_DE_YURIRIA, level: 4, name: "Laguna de Yuriria", capacity: 800, normalLevel: 0.86, floodLevel: 0.98, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.LA_SOLEDAD, level: 4, name: "La Soledad", capacity: 150, normalLevel: 0.74, floodLevel: 0.91, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.LA_PURISIMA, level: 4, name: "La Purísima", capacity: 700, normalLevel: 0.84, floodLevel: 0.96, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.EL_PALOTE, level: 5, name: "El Palote", capacity: 320, normalLevel: 0.77, floodLevel: 0.93, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.LA_GOLONDRINA, level: 5, name: "La Golondrina", capacity: 280, normalLevel: 0.75, floodLevel: 0.9, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.MARIANO_ABASOLO, level: 5, name: "Mariano Abasolo", capacity: 380, normalLevel: 0.8, floodLevel: 0.95, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.LAGUNA_DE_FRESNO, level: 6, name: "Laguna de Fresno", capacity: 420, normalLevel: 0.83, floodLevel: 0.97, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.LA_POLVORA, level: 6, name: "La Pólvora", capacity: 180, normalLevel: 0.71, floodLevel: 0.87, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.DE_GONZALO, level: 6, name: "De Gonzalo", capacity: 520, normalLevel: 0.82, floodLevel: 0.96, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.UREPETIRO, level: 7, name: "Urepetiro", capacity: 230, normalLevel: 0.73, floodLevel: 0.89, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.GUARACHA, level: 7, name: "Guaracha", capacity: 480, normalLevel: 0.79, floodLevel: 0.94, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.JARIPO, level: 8, name: "Jaripo", capacity: 270, normalLevel: 0.76, floodLevel: 0.92, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.COPANDARO, level: 8, name: "Copándaro", capacity: 340, normalLevel: 0.78, floodLevel: 0.93, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.LAGO_DE_CHAPALA, level: 9, name: "Lago de Chapala", capacity: 1500, normalLevel: 0.85, floodLevel: 0.98, currentLevel: 0.5  }
         ];
         
         reservoirs = calculatePositions(reservoirs, width, height);
@@ -202,8 +217,22 @@
             { source: RESERVOIR_IDS.COPANDARO, target: RESERVOIR_IDS.LAGO_DE_CHAPALA }
         ];
 
-        // Calculate the maximum capacity for scaling
+        // Calculate the maximum and minimum capacity for scaling
         const maxCapacity = Math.max(...reservoirs.map(r => r.capacity));
+        const minCapacity = Math.min(...reservoirs.map(r => r.capacity));
+
+        // Function to calculate bucket size
+        function calculateBucketSize(capacity) {
+            // Use a logarithmic scale to determine bucket size
+            // This will make smaller reservoirs more visible while still showing size differences
+            const minSize = 30; // Minimum bucket size
+            const maxSize = 100; // Maximum bucket size
+            const scale = d3.scaleLog()
+                .domain([minCapacity, maxCapacity])
+                .range([minSize, maxSize]);
+            
+            return scale(capacity);
+        }
 
         // Draw rivers
         svg.selectAll(".river")
@@ -214,7 +243,11 @@
             .attr("d", d => {
                 const source = reservoirs.find(r => r.id === d.source);
                 const target = reservoirs.find(r => r.id === d.target);
-                return `M${source.x},${source.y + 40} C${source.x},${(source.y + target.y) / 2} ${target.x},${(source.y + target.y) / 2} ${target.x},${target.y - 40}`;
+                const midY = (source.y + target.y) / 2;
+                return `M${source.x},${source.y + 40} 
+                        C${source.x},${midY} 
+                        ${target.x},${midY} 
+                        ${target.x},${target.y - 40}`;
             });
 
         // Draw reservoirs as buckets
@@ -223,14 +256,16 @@
             .enter()
             .append("g")
             .attr("class", "bucket-group")
-            .attr("transform", d => `translate(${d.x - 35}, ${d.y - 40})`);
+            .attr("transform", d => {
+                const bucketSize = calculateBucketSize(d.capacity);
+                return `translate(${d.x - bucketSize/2}, ${d.y - bucketSize/2})`;
+            });
 
         bucketGroup.append("path")
             .attr("class", "bucket")
             .attr("d", d => {
-                const width = 70 * Math.sqrt(d.capacity / maxCapacity);
-                const height = 80 * Math.sqrt(d.capacity / maxCapacity);
-                return `M0,0 L0,${height} A${width/2},5 0 0,0 ${width},${height} L${width},0 Z`;
+                const size = calculateBucketSize(d.capacity);
+                return `M0,0 L0,${size} A${size/4},5 0 0,0 ${size},${size} L${size},0 Z`;
             });
 
         const waterGroup = bucketGroup.append("g")
@@ -240,46 +275,46 @@
         waterGroup.append("rect")
             .attr("class", "water")
             .attr("x", 0)
-            .attr("y", 0)
-            .attr("width", d => 70 * Math.sqrt(d.capacity / maxCapacity))
-            .attr("height", d => 80 * Math.sqrt(d.capacity / maxCapacity));
+            .attr("y", d => calculateBucketSize(d.capacity) * (1 - d.currentLevel))
+            .attr("width", d => calculateBucketSize(d.capacity))
+            .attr("height", d => calculateBucketSize(d.capacity) * d.currentLevel);
 
         // Add normal and flood level lines
         bucketGroup.append("line")
             .attr("class", "normal-level")
             .attr("x1", 0)
-            .attr("y1", d => 80 * Math.sqrt(d.capacity / maxCapacity) * (1 - d.normalLevel))
-            .attr("x2", d => 70 * Math.sqrt(d.capacity / maxCapacity))
-            .attr("y2", d => 80 * Math.sqrt(d.capacity / maxCapacity) * (1 - d.normalLevel));
+            .attr("y1", d => calculateBucketSize(d.capacity) * (1 - d.normalLevel))
+            .attr("x2", d => calculateBucketSize(d.capacity))
+            .attr("y2", d => calculateBucketSize(d.capacity) * (1 - d.normalLevel));
 
         bucketGroup.append("line")
             .attr("class", "flood-level")
             .attr("x1", 0)
-            .attr("y1", d => 80 * Math.sqrt(d.capacity / maxCapacity) * (1 - d.floodLevel))
-            .attr("x2", d => 70 * Math.sqrt(d.capacity / maxCapacity))
-            .attr("y2", d => 80 * Math.sqrt(d.capacity / maxCapacity) * (1 - d.floodLevel));
+            .attr("y1", d => calculateBucketSize(d.capacity) * (1 - d.floodLevel))
+            .attr("x2", d => calculateBucketSize(d.capacity))
+            .attr("y2", d => calculateBucketSize(d.capacity) * (1 - d.floodLevel));
 
         // Add reservoir labels and data
         bucketGroup.append("text")
             .attr("class", "reservoir-label")
-            .attr("x", d => 35 * Math.sqrt(d.capacity / maxCapacity))
-            .attr("y", -10)
+            .attr("x", d => calculateBucketSize(d.capacity) / 2)
+            .attr("y", d => -10)
             .attr("text-anchor", "middle")
             .text(d => d.name);
 
         const dataGroup = bucketGroup.append("g")
             .attr("class", "data-group")
-            .attr("transform", d => `translate(${75 * Math.sqrt(d.capacity / maxCapacity)}, 0)`);
+            .attr("transform", d => `translate(${calculateBucketSize(d.capacity) + 5}, 0)`);
 
         dataGroup.append("text")
             .attr("class", "level-label")
             .attr("y", 20)
-            .text(d => `${(d.level * 100).toFixed(1)}%`);
+            .text(d => `${(d.currentLevel * 100).toFixed(1)}%`);
 
         dataGroup.append("text")
             .attr("class", "level-label")
             .attr("y", 40)
-            .text(d => `${(d.level * d.capacity).toFixed(2)} hm³`);
+            .text(d => `${(d.currentLevel * d.capacity).toFixed(2)} hm³`);
 
         dataGroup.append("text")
             .attr("class", "level-label")
@@ -295,9 +330,8 @@
             .attr("id", d => `bucket-clip-${d.id}`)
             .append("path")
             .attr("d", d => {
-                const width = 70 * Math.sqrt(d.capacity / maxCapacity);
-                const height = 80 * Math.sqrt(d.capacity / maxCapacity);
-                return `M0,0 L0,${height} A${width/2},5 0 0,0 ${width},${height} L${width},0 Z`;
+                const size = calculateBucketSize(d.capacity);
+                return `M0,0 L0,${size} A${size/4},5 0 0,0 ${size},${size} L${size},0 Z`;
             });
 
         // Add legend
@@ -332,7 +366,7 @@
         function updateReservoirs(date) {
             // Update reservoir levels based on the date
             reservoirs.forEach(reservoir => {
-                reservoir.level = Math.random(); // Replace with actual data based on date
+                reservoir.currentLevel = Math.random(); // Replace with actual data based on date
             });
 
             svg.selectAll(".water-group")
@@ -340,18 +374,18 @@
                 .select(".water")
                 .transition()
                 .duration(500)
-                .attr("y", d => 80 * Math.sqrt(d.capacity / maxCapacity) * (1 - d.level))
-                .attr("height", d => 80 * Math.sqrt(d.capacity / maxCapacity) * d.level);
+                .attr("y", d => calculateBucketSize(d.capacity) * (1 - d.currentLevel))
+                .attr("height", d => calculateBucketSize(d.capacity) * d.currentLevel);
 
             svg.selectAll(".data-group")
                 .data(reservoirs)
                 .select("text:nth-child(1)")
-                .text(d => `${(d.level * 100).toFixed(1)}%`);
+                .text(d => `${(d.currentLevel * 100).toFixed(1)}%`);
 
             svg.selectAll(".data-group")
                 .data(reservoirs)
                 .select("text:nth-child(2)")
-                .text(d => `${(d.level * d.capacity).toFixed(2)} hm³`);
+                .text(d => `${(d.currentLevel * d.capacity).toFixed(2)} hm³`);
 
             d3.select("#current-date").text(date.toDateString());
         }
