@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <title>Advanced Watershed Visualization</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
     <style>
@@ -198,6 +199,35 @@
         
         reservoirs = calculatePositions(reservoirs, width, height);
 
+        function updateReservoirStaticData(reservoirData) {
+            reservoirs.forEach(reservoir => {
+                const data = reservoirData.find(d => d.clavesih === reservoir.id);
+                if (data) {
+                    reservoir.capacity = data.namoalmac;
+                    reservoir.normalLevel = data.namoelev / data.elevcorona;
+                    reservoir.floodLevel = data.nameelev / data.elevcorona;
+                }
+            });
+            // Recalculate positions after updating data
+            reservoirs = calculatePositions(reservoirs, width, height);
+        }
+
+        let maxCapacity, minCapacity;
+
+        function calculateBucketSize(capacity) {
+            if (!maxCapacity || !minCapacity) {
+                maxCapacity = Math.max(...reservoirs.map(r => r.capacity));
+                minCapacity = Math.min(...reservoirs.map(r => r.capacity));
+            }
+            const minSize = 30;
+            const maxSize = 100;
+            const scale = d3.scaleLog()
+                .domain([Math.max(minCapacity, 1), maxCapacity]) // Ensure minimum domain value is at least 1
+                .range([minSize, maxSize]);
+            
+            return scale(Math.max(capacity, 1)); // Ensure minimum capacity is at least 1
+        }
+
         const rivers = [
             { source: RESERVOIR_IDS.JOSE_A_ALZATE, target: RESERVOIR_IDS.TEPUXTEPEC },
             { source: RESERVOIR_IDS.IGNACIO_RAMIREZ, target: RESERVOIR_IDS.TEPUXTEPEC },
@@ -231,23 +261,6 @@
             { source: RESERVOIR_IDS.JARIPO, target: RESERVOIR_IDS.LAGO_DE_CHAPALA },//
             { source: RESERVOIR_IDS.COPANDARO, target: RESERVOIR_IDS.LAGO_DE_CHAPALA }//
         ];
-
-        // Calculate the maximum and minimum capacity for scaling
-        const maxCapacity = Math.max(...reservoirs.map(r => r.capacity));
-        const minCapacity = Math.min(...reservoirs.map(r => r.capacity));
-
-        // Function to calculate bucket size
-        function calculateBucketSize(capacity) {
-            // Use a logarithmic scale to determine bucket size
-            // This will make smaller reservoirs more visible while still showing size differences
-            const minSize = 30; // Minimum bucket size
-            const maxSize = 100; // Maximum bucket size
-            const scale = d3.scaleLog()
-                .domain([minCapacity, maxCapacity])
-                .range([minSize, maxSize]);
-            
-            return scale(capacity);
-        }
 
         // Draw rivers
         svg.selectAll(".river")
@@ -378,56 +391,232 @@
             .attr("y", 25)
             .text("Maximum Flood Pool Level");
 
-        function updateReservoirs(date) {
-            // Update reservoir levels based on the date
-            reservoirs.forEach(reservoir => {
-                reservoir.currentLevel = Math.random(); // Replace with actual data based on date
-            });
+            function updateReservoirs(date, data) {
+                reservoirs.forEach(reservoir => {
+                    const reservoirData = data[reservoir.id];
+                    if (reservoirData && reservoirData.almacenaactual != null && reservoir.capacity > 0) {
+                        reservoir.currentLevel = Math.min(Math.max(reservoirData.almacenaactual / reservoir.capacity, 0), 1);
+                    } else {
+                        reservoir.currentLevel = 0; // Default to 0 if no data available or invalid data
+                    }
+                });
 
-            svg.selectAll(".water-group")
-                .data(reservoirs)
-                .select(".water")
-                .transition()
-                .duration(500)
-                .attr("y", d => calculateBucketSize(d.capacity) * (1 - d.currentLevel))
-                .attr("height", d => calculateBucketSize(d.capacity) * d.currentLevel);
+                svg.selectAll(".water-group")
+                    .data(reservoirs)
+                    .select(".water")
+                    .transition()
+                    .duration(500)
+                    .attr("y", d => calculateBucketSize(d.capacity) * (1 - d.currentLevel))
+                    .attr("height", d => calculateBucketSize(d.capacity) * d.currentLevel);
 
-            svg.selectAll(".data-group")
-                .data(reservoirs)
-                .select("text:nth-child(1)")
-                .text(d => `${(d.currentLevel * 100).toFixed(1)}%`);
+                svg.selectAll(".data-group")
+                    .data(reservoirs)
+                    .select("text:nth-child(1)")
+                    .text(d => `${(d.currentLevel * 100).toFixed(1)}%`);
 
-            svg.selectAll(".data-group")
-                .data(reservoirs)
-                .select("text:nth-child(2)")
-                .text(d => `${(d.currentLevel * d.capacity).toFixed(2)} hm³`);
+                svg.selectAll(".data-group")
+                    .data(reservoirs)
+                    .select("text:nth-child(2)")
+                    .text(d => `${(d.currentLevel * d.capacity).toFixed(2)} hm³`);
 
-            d3.select("#current-date").text(date.toDateString());
+                d3.select("#current-date").text(date.toDateString());
+            }
+
+        async function fetchSimulationData(startDate, endDate) {
+            const data = {};
+            for (const reservoir of reservoirs) {
+                try {
+                    const response = await fetch(`/api/data/${reservoir.id}?start_date=${startDate}&end_date=${endDate}`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const reservoirData = await response.json();
+                    reservoirData.forEach(point => {
+                        if (!data[point.fechamonitoreo]) {
+                            data[point.fechamonitoreo] = {};
+                        }
+                        data[point.fechamonitoreo][reservoir.id] = point;
+                    });
+                } catch (error) {
+                    console.error(`Error fetching data for reservoir ${reservoir.id}:`, error);
+                }
+            }
+            return data;
         }
 
         let animationSpeed = 1000;
         let animationTimer;
 
-        document.getElementById("simulate").addEventListener("click", () => {
-            const startDate = new Date(document.getElementById("start-date").value);
-            const endDate = new Date(document.getElementById("end-date").value);
-            let currentDate = new Date(startDate);
-
-            function simulateDay() {
-                if (currentDate <= endDate) {
-                    updateReservoirs(currentDate);
-                    currentDate.setDate(currentDate.getDate() + 1);
-                    animationTimer = setTimeout(simulateDay, animationSpeed);
+        async function initializeVisualization() {
+            try {
+                // Fetch static data for each reservoir
+                for (let reservoir of reservoirs) {
+                    const response = await fetch(`/api/reservoir/${reservoir.id}`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const data = await response.json();
+                    reservoir.capacity = data.namoalmac || 1; // Use 1 as fallback to avoid division by zero
+                    reservoir.normalLevel = (data.namoelev && data.elevcorona) ? data.namoelev / data.elevcorona : 0.8;
+                    reservoir.floodLevel = (data.nameelev && data.elevcorona) ? data.nameelev / data.elevcorona : 0.9;
+                    console.log(`Reservoir ${reservoir.id}: capacity=${reservoir.capacity}, normalLevel=${reservoir.normalLevel}, floodLevel=${reservoir.floodLevel}`);
                 }
-            }
 
-            clearTimeout(animationTimer);
-            simulateDay();
+                // Calculate max and min capacity
+                maxCapacity = Math.max(...reservoirs.map(r => r.capacity));
+                minCapacity = Math.min(...reservoirs.map(r => r.capacity));
+
+                // Recalculate positions and redraw visualization
+                reservoirs = calculatePositions(reservoirs, width, height);
+                
+                // Redraw rivers
+                svg.selectAll(".river").remove();
+                svg.selectAll(".river")
+                    .data(rivers)
+                    .enter()
+                    .append("path")
+                    .attr("class", "river")
+                    .attr("d", d => {
+                        const source = reservoirs.find(r => r.id === d.source);
+                        const target = reservoirs.find(r => r.id === d.target);
+                        const midY = (source.y + target.y) / 2;
+                        return `M${source.x},${source.y + 40} 
+                                C${source.x},${midY} 
+                                ${target.x},${midY} 
+                                ${target.x},${target.y - 40}`;
+                    });
+
+                // Redraw reservoirs
+                svg.selectAll(".bucket-group").remove();
+                const bucketGroup = svg.selectAll(".bucket-group")
+                    .data(reservoirs)
+                    .enter()
+                    .append("g")
+                    .attr("class", "bucket-group")
+                    .attr("transform", d => {
+                        const bucketSize = calculateBucketSize(d.capacity);
+                        return `translate(${d.x - bucketSize/2}, ${d.y - bucketSize/2})`;
+                    });
+
+                bucketGroup.append("path")
+                    .attr("class", "bucket")
+                    .attr("d", d => {
+                        const size = calculateBucketSize(d.capacity);
+                        return `M0,0 L0,${size} A${size/4},5 0 0,0 ${size},${size} L${size},0 Z`;
+                    });
+
+                const waterGroup = bucketGroup.append("g")
+                    .attr("class", "water-group")
+                    .attr("clip-path", d => `url(#bucket-clip-${d.id})`);
+
+                waterGroup.append("rect")
+                    .attr("class", "water")
+                    .attr("x", 0)
+                    .attr("y", d => calculateBucketSize(d.capacity))
+                    .attr("width", d => calculateBucketSize(d.capacity))
+                    .attr("height", 0);
+
+                // Update the normal and flood level lines
+                bucketGroup.append("line")
+                    .attr("class", "normal-level")
+                    .attr("x1", 0)
+                    .attr("y1", d => calculateBucketSize(d.capacity) * (1 - Math.min(Math.max(d.normalLevel, 0), 1)))
+                    .attr("x2", d => calculateBucketSize(d.capacity))
+                    .attr("y2", d => calculateBucketSize(d.capacity) * (1 - Math.min(Math.max(d.normalLevel, 0), 1)));
+
+                bucketGroup.append("line")
+                    .attr("class", "flood-level")
+                    .attr("x1", 0)
+                    .attr("y1", d => calculateBucketSize(d.capacity) * (1 - Math.min(Math.max(d.floodLevel, 0), 1)))
+                    .attr("x2", d => calculateBucketSize(d.capacity))
+                    .attr("y2", d => calculateBucketSize(d.capacity) * (1 - Math.min(Math.max(d.floodLevel, 0), 1)));
+
+                // Add reservoir labels and data
+                bucketGroup.append("text")
+                    .attr("class", "reservoir-label")
+                    .attr("x", d => calculateBucketSize(d.capacity) / 2)
+                    .attr("y", d => -10)
+                    .attr("text-anchor", "middle")
+                    .text(d => d.name);
+
+                const dataGroup = bucketGroup.append("g")
+                    .attr("class", "data-group")
+                    .attr("transform", d => `translate(${calculateBucketSize(d.capacity) + 5}, 0)`);
+
+                dataGroup.append("text")
+                    .attr("class", "level-label")
+                    .attr("y", 20)
+                    .text("0%");
+
+                dataGroup.append("text")
+                    .attr("class", "level-label")
+                    .attr("y", 40)
+                    .text("0 hm³");
+
+                dataGroup.append("text")
+                    .attr("class", "level-label")
+                    .attr("y", 60)
+                    .text(d => `Cap: ${d.capacity.toFixed(2)} hm³`);
+
+                // Create clip paths for the water
+                svg.append("defs")
+                    .selectAll("clipPath")
+                    .data(reservoirs)
+                    .enter()
+                    .append("clipPath")
+                    .attr("id", d => `bucket-clip-${d.id}`)
+                    .append("path")
+                    .attr("d", d => {
+                        const size = calculateBucketSize(d.capacity);
+                        return `M0,0 L0,${size} A${size/4},5 0 0,0 ${size},${size} L${size},0 Z`;
+                    });
+
+                // Set up date inputs with default values
+                const today = new Date();
+                const oneYearAgo = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
+                
+                document.getElementById('start-date').value = oneYearAgo.toISOString().split('T')[0];
+                document.getElementById('end-date').value = today.toISOString().split('T')[0];
+
+            } catch (error) {
+                console.error('Error initializing visualization:', error);
+                alert('Failed to initialize visualization. Please refresh the page.');
+            }
+        }
+
+        document.getElementById("simulate").addEventListener("click", async () => {
+            const startDate = document.getElementById("start-date").value;
+            const endDate = document.getElementById("end-date").value;
+
+            try {
+                const simulationData = await fetchSimulationData(startDate, endDate);
+                const dates = Object.keys(simulationData).sort();
+                let dateIndex = 0;
+
+                function simulateDay() {
+                    if (dateIndex < dates.length) {
+                        const currentDate = dates[dateIndex];
+                        updateReservoirs(new Date(currentDate), simulationData[currentDate]);
+                        dateIndex++;
+                        animationTimer = setTimeout(simulateDay, animationSpeed);
+                    }
+                }
+
+                clearTimeout(animationTimer);
+                simulateDay();
+            } catch (error) {
+                console.error('Error in simulation:', error);
+                alert('Failed to run simulation. Please try again.');
+            }
         });
 
         document.getElementById("speed-control").addEventListener("input", (event) => {
-            animationSpeed = 2100 - event.target.value;
+            animationSpeed = 2100 - parseInt(event.target.value);
         });
+
+        // Call initializeVisualization when the page loads
+        initializeVisualization();
+
     </script>
 </body>
 </html>
