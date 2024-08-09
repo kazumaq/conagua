@@ -579,24 +579,26 @@
 
                 // Set up date inputs with default values
                 const today = new Date();
-                const oneYearAgo = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
+                const oneMonthAgo = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
                 
-                document.getElementById('start-date').value = oneYearAgo.toISOString().split('T')[0];
+                document.getElementById('start-date').value = oneMonthAgo.toISOString().split('T')[0];
                 document.getElementById('end-date').value = today.toISOString().split('T')[0];
 
             } catch (error) {
                 console.error('Error initializing visualization:', error);
                 alert('Failed to initialize visualization. Please refresh the page.');
             }
-        }
 
-        document.getElementById("simulate").addEventListener("click", async () => {
+            // Start the simulation immediately after initialization
+            startSimulation();
+        }
+        async function startSimulation() {
             const startDate = document.getElementById("start-date").value;
             const endDate = document.getElementById("end-date").value;
             const loadingIndicator = document.getElementById("loading");
 
             try {
-                loadingIndicator.style.display = "block";  // Show loading indicator
+                loadingIndicator.style.display = "block";
                 const simulationData = await fetchSimulationData(startDate, endDate);
 
                 if (Object.keys(simulationData).length === 0) {
@@ -621,10 +623,10 @@
                 console.error('Error in simulation:', error);
                 alert('Failed to run simulation. Please try again.');
             } finally {
-                loadingIndicator.style.display = "none";  // Hide loading indicator
+                loadingIndicator.style.display = "none";
             }
-        });
-
+        }
+        document.getElementById("simulate").addEventListener("click", startSimulation);
         document.getElementById("speed-control").addEventListener("input", (event) => {
             animationSpeed = 2100 - parseInt(event.target.value);
         });
