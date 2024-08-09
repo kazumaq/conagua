@@ -85,7 +85,16 @@ function updateChartLanguage() {
 // Initialize the application
 function init() {
     console.log("Initializing application...");
-    fetchStates();
+    fetchStates().then(() => {
+        // Check if the default reservoir exists
+        const reservoirSelect = document.getElementById('reservoirSelect');
+        const defaultReservoirOption = Array.from(reservoirSelect.options).find(option => option.value === defaultReservoir);
+        if (!defaultReservoirOption) {
+            console.warn(`Default reservoir ${defaultReservoir} not found in the list. Using the first available reservoir.`);
+            defaultReservoir = reservoirSelect.options[0].value;
+        }
+        loadReservoirData(defaultReservoir);
+    });
     document.getElementById('languageSelect').addEventListener('change', (e) => changeLanguage(e.target.value));
 }
 
@@ -127,19 +136,32 @@ function fetchReservoirs(state) {
 function loadReservoirData(clavesih) {
     console.log(`Loading data for reservoir: ${clavesih}`);
     fetch(`/api/data/${clavesih}`)
-        .then(response => response.json())
+        .then(response => {
+            console.log(`Response status: ${response.status}`);
+            return response.json();
+        })
         .then(data => {
-            console.log(`Retrieved ${data.length} data points for reservoir ${clavesih}`);
+            console.log(`Retrieved data for reservoir ${clavesih}:`, data);
+            if (data.length === 0) {
+                console.warn(`No data received for reservoir ${clavesih}`);
+                return;
+            }
             currentData = data;
             processReservoirData(data);
         })
         .catch(error => {
-            console.error(translations[currentLanguage].errorLoadingReservoirData, error);
+            console.error(`Error loading data for reservoir ${clavesih}:`, error);
         });
+});
 }
 
 // Process and display reservoir data
 function processReservoirData(data) {
+    if (!data || data.length === 0) {
+        console.warn("No data to process");
+        return;
+    }
+
     // Sort data by date
     data.sort((a, b) => new Date(a.fechamonitoreo) - new Date(b.fechamonitoreo));
 

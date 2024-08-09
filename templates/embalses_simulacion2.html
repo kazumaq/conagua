@@ -429,27 +429,33 @@
                 d3.select("#current-date").text(date.toDateString());
             }
 
-        async function fetchSimulationData(startDate, endDate) {
-            const data = {};
-            for (const reservoir of reservoirs) {
-                try {
-                    const response = await fetch(`/api/data/${reservoir.id}?start_date=${startDate}&end_date=${endDate}`);
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    const reservoirData = await response.json();
-                    reservoirData.forEach(point => {
-                        if (!data[point.fechamonitoreo]) {
-                            data[point.fechamonitoreo] = {};
+            async function fetchSimulationData(startDate, endDate) {
+                const data = {};
+                for (const reservoir of reservoirs) {
+                    try {
+                        console.log(`Fetching data for reservoir ${reservoir.id} from ${startDate} to ${endDate}`);
+                        const response = await fetch(`/api/data/${reservoir.id}?start_date=${startDate}&end_date=${endDate}`);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
                         }
-                        data[point.fechamonitoreo][reservoir.id] = point;
-                    });
-                } catch (error) {
-                    console.error(`Error fetching data for reservoir ${reservoir.id}:`, error);
+                        const reservoirData = await response.json();
+                        console.log(`Received ${reservoirData.length} data points for reservoir ${reservoir.id}`);
+                        if (reservoirData.length === 0) {
+                            console.warn(`No data received for reservoir ${reservoir.id}`);
+                        }
+                        reservoirData.forEach(point => {
+                            if (!data[point.fechamonitoreo]) {
+                                data[point.fechamonitoreo] = {};
+                            }
+                            data[point.fechamonitoreo][reservoir.id] = point;
+                        });
+                    } catch (error) {
+                        console.error(`Error fetching data for reservoir ${reservoir.id}:`, error);
+                    }
                 }
+                console.log(`Total dates with data: ${Object.keys(data).length}`);
+                return data;
             }
-            return data;
-        }
 
         let animationSpeed = 1000;
         let animationTimer;
@@ -590,7 +596,17 @@
             }
 
             // Start the simulation immediately after initialization
-            startSimulation();
+            const startDate = document.getElementById("start-date").value;
+            const endDate = document.getElementById("end-date").value;
+            console.log(`Attempting to start simulation from ${startDate} to ${endDate}`);
+            const simulationData = await fetchSimulationData(startDate, endDate);
+            if (Object.keys(simulationData).length > 0) {
+                console.log("Data received, starting simulation");
+                startSimulation();
+            } else {
+                console.error("No data available for simulation");
+                alert("No data available for the selected date range. Please try different dates.");
+            }
         }
         async function startSimulation() {
             const startDate = document.getElementById("start-date").value;
@@ -599,21 +615,28 @@
 
             try {
                 loadingIndicator.style.display = "block";
+                console.log(`Starting simulation from ${startDate} to ${endDate}`);
                 const simulationData = await fetchSimulationData(startDate, endDate);
+
+                console.log(`Received simulation data:`, simulationData);
 
                 if (Object.keys(simulationData).length === 0) {
                     throw new Error("No data available for the selected date range.");
                 }
 
                 const dates = Object.keys(simulationData).sort();
+                console.log(`Simulation dates: ${dates[0]} to ${dates[dates.length - 1]}`);
                 let dateIndex = 0;
 
                 function simulateDay() {
                     if (dateIndex < dates.length) {
                         const currentDate = dates[dateIndex];
+                        console.log(`Simulating date: ${currentDate}`);
                         updateReservoirs(new Date(currentDate), simulationData[currentDate]);
                         dateIndex++;
                         animationTimer = setTimeout(simulateDay, animationSpeed);
+                    } else {
+                        console.log("Simulation complete");
                     }
                 }
 
