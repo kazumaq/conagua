@@ -114,10 +114,10 @@
             // Group reservoirs by levels
             const levels = {};
             reservoirs.forEach(reservoir => {
-                if (!levels[reservoir.level]) {
-                    levels[reservoir.level] = [];
+                if (!levels[reservoir.row]) {
+                    levels[reservoir.row] = [];
                 }
-                levels[reservoir.level].push(reservoir);
+                levels[reservoir.row].push(reservoir);
             });
 
             const maxLevel = Math.max(...Object.keys(levels).map(Number));
@@ -178,39 +178,39 @@
         // Sample data for reservoirs and rivers
 
         let reservoirs = [
-            { id: RESERVOIR_IDS.TEPETITLAN, level: 0, name: "Tepetitlán", capacity: 400, normalLevel: 0.88, floodLevel: 0.99, currentLevel: 0.5  },
-            { id: RESERVOIR_IDS.JOSE_A_ALZATE, level: 0, name: "José A. Alzate", capacity: 1000, normalLevel: 0.8, floodLevel: 0.95, currentLevel: 0.5  },
-            { id: RESERVOIR_IDS.IGNACIO_RAMIREZ, level: 0, name: "Ignacio Ramírez", capacity: 500, normalLevel: 0.75, floodLevel: 0.9, currentLevel: 0.5  },
-            { id: RESERVOIR_IDS.JOSE_FABELA, level: 0, name: "José Fabela", capacity: 250, normalLevel: 0.7, floodLevel: 0.88, currentLevel: 0.5  },
-            { id: RESERVOIR_IDS.PENUELAS, level: 0, name: "Peñuelas", capacity: 450, normalLevel: 0.79, floodLevel: 0.94, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.TEPETITLAN, row: 0, name: "Tepetitlán", capacity: 400, normalLevel: 0.88, floodLevel: 0.99, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.JOSE_A_ALZATE, row: 0, name: "José A. Alzate", capacity: 1000, normalLevel: 0.8, floodLevel: 0.95, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.IGNACIO_RAMIREZ, row: 0, name: "Ignacio Ramírez", capacity: 500, normalLevel: 0.75, floodLevel: 0.9, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.JOSE_FABELA, row: 0, name: "José Fabela", capacity: 250, normalLevel: 0.7, floodLevel: 0.88, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.PENUELAS, row: 0, name: "Peñuelas", capacity: 450, normalLevel: 0.79, floodLevel: 0.94, currentLevel: 0.5  },
 
-            { id: RESERVOIR_IDS.TEPUXTEPEC, level: 1, name: "Tepuxtepec", capacity: 750, normalLevel: 0.85, floodLevel: 0.98, currentLevel: 0.5  },
-            { id: RESERVOIR_IDS.TERCER_MUNDO, level: 1, name: "Tercer Mundo", capacity: 300, normalLevel: 0.78, floodLevel: 0.93, currentLevel: 0.5  },
-            { id: RESERVOIR_IDS.LAS_ADJUNTAS, level: 1, name: "Las Adjuntas", capacity: 350, normalLevel: 0.76, floodLevel: 0.92, currentLevel: 0.5  },
-            { id: RESERVOIR_IDS.IGNACIO_ALLENDE, level: 1, name: "Ignacio Allende", capacity: 550, normalLevel: 0.81, floodLevel: 0.97, currentLevel: 0.5  },
-            { id: RESERVOIR_IDS.COINTZIO, level: 1, name: "Cointzio", capacity: 200, normalLevel: 0.72, floodLevel: 0.89, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.TEPUXTEPEC, row: 1, name: "Tepuxtepec", capacity: 750, normalLevel: 0.85, floodLevel: 0.98, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.TERCER_MUNDO, row: 1, name: "Tercer Mundo", capacity: 300, normalLevel: 0.78, floodLevel: 0.93, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.LAS_ADJUNTAS, row: 1, name: "Las Adjuntas", capacity: 350, normalLevel: 0.76, floodLevel: 0.92, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.IGNACIO_ALLENDE, row: 1, name: "Ignacio Allende", capacity: 550, normalLevel: 0.81, floodLevel: 0.97, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.COINTZIO, row: 1, name: "Cointzio", capacity: 200, normalLevel: 0.72, floodLevel: 0.89, currentLevel: 0.5  },
 
-            { id: RESERVOIR_IDS.SOLIS, level: 2, name: "Solís", capacity: 600, normalLevel: 0.82, floodLevel: 0.96, currentLevel: 0.5  },
-            { id: RESERVOIR_IDS.LAGUNA_DE_YURIRIA, level: 2, name: "Laguna de Yuriria", capacity: 800, normalLevel: 0.86, floodLevel: 0.98, currentLevel: 0.5  },
-            { id: RESERVOIR_IDS.LA_SOLEDAD, level: 2, name: "La Soledad", capacity: 150, normalLevel: 0.74, floodLevel: 0.91, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.SOLIS, row: 2, name: "Solís", capacity: 600, normalLevel: 0.82, floodLevel: 0.96, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.LAGUNA_DE_YURIRIA, row: 2, name: "Laguna de Yuriria", capacity: 800, normalLevel: 0.86, floodLevel: 0.98, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.LA_SOLEDAD, row: 2, name: "La Soledad", capacity: 150, normalLevel: 0.74, floodLevel: 0.91, currentLevel: 0.5  },
 
-            { id: RESERVOIR_IDS.LA_PURISIMA, level: 3, name: "La Purísima", capacity: 700, normalLevel: 0.84, floodLevel: 0.96, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.LA_PURISIMA, row: 3, name: "La Purísima", capacity: 700, normalLevel: 0.84, floodLevel: 0.96, currentLevel: 0.5  },
 
-            { id: RESERVOIR_IDS.EL_PALOTE, level: 4, name: "El Palote", capacity: 320, normalLevel: 0.77, floodLevel: 0.93, currentLevel: 0.5  },
-            { id: RESERVOIR_IDS.LA_GOLONDRINA, level: 4, name: "La Golondrina", capacity: 280, normalLevel: 0.75, floodLevel: 0.9, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.EL_PALOTE, row: 4, name: "El Palote", capacity: 320, normalLevel: 0.77, floodLevel: 0.93, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.LA_GOLONDRINA, row: 4, name: "La Golondrina", capacity: 280, normalLevel: 0.75, floodLevel: 0.9, currentLevel: 0.5  },
 
-            { id: RESERVOIR_IDS.MARIANO_ABASOLO, level: 5, name: "Mariano Abasolo", capacity: 380, normalLevel: 0.8, floodLevel: 0.95, currentLevel: 0.5  },
-            { id: RESERVOIR_IDS.LAGUNA_DE_FRESNO, level: 5, name: "Laguna de Fresno", capacity: 420, normalLevel: 0.83, floodLevel: 0.97, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.MARIANO_ABASOLO, row: 5, name: "Mariano Abasolo", capacity: 380, normalLevel: 0.8, floodLevel: 0.95, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.LAGUNA_DE_FRESNO, row: 5, name: "Laguna de Fresno", capacity: 420, normalLevel: 0.83, floodLevel: 0.97, currentLevel: 0.5  },
 
-            { id: RESERVOIR_IDS.LA_POLVORA, level: 6, name: "La Pólvora", capacity: 180, normalLevel: 0.71, floodLevel: 0.87, currentLevel: 0.5  },
-            { id: RESERVOIR_IDS.YURECUARO, level: 6, name: "Yurécuaro", capacity: 180, normalLevel: 0.71, floodLevel: 0.87, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.LA_POLVORA, row: 6, name: "La Pólvora", capacity: 180, normalLevel: 0.71, floodLevel: 0.87, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.YURECUARO, row: 6, name: "Yurécuaro", capacity: 180, normalLevel: 0.71, floodLevel: 0.87, currentLevel: 0.5  },
 
-            { id: RESERVOIR_IDS.DE_GONZALO, level: 7, name: "De Gonzalo", capacity: 520, normalLevel: 0.82, floodLevel: 0.96, currentLevel: 0.5  },
-            { id: RESERVOIR_IDS.UREPETIRO, level: 7, name: "Urepetiro", capacity: 230, normalLevel: 0.73, floodLevel: 0.89, currentLevel: 0.5  },
-            { id: RESERVOIR_IDS.GUARACHA, level: 7, name: "Guaracha", capacity: 480, normalLevel: 0.79, floodLevel: 0.94, currentLevel: 0.5  },
-            { id: RESERVOIR_IDS.JARIPO, level: 7, name: "Jaripo", capacity: 270, normalLevel: 0.76, floodLevel: 0.92, currentLevel: 0.5  },
-            { id: RESERVOIR_IDS.COPANDARO, level: 7, name: "Copándaro", capacity: 340, normalLevel: 0.78, floodLevel: 0.93, currentLevel: 0.5  },
-            { id: RESERVOIR_IDS.LAGO_DE_CHAPALA, level: 9, name: "Lago de Chapala", capacity: 1500, normalLevel: 0.85, floodLevel: 0.98, currentLevel: 0.5  }
+            { id: RESERVOIR_IDS.DE_GONZALO, row: 7, name: "De Gonzalo", capacity: 520, normalLevel: 0.82, floodLevel: 0.96, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.UREPETIRO, row: 7, name: "Urepetiro", capacity: 230, normalLevel: 0.73, floodLevel: 0.89, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.GUARACHA, row: 7, name: "Guaracha", capacity: 480, normalLevel: 0.79, floodLevel: 0.94, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.JARIPO, row: 7, name: "Jaripo", capacity: 270, normalLevel: 0.76, floodLevel: 0.92, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.COPANDARO, row: 7, name: "Copándaro", capacity: 340, normalLevel: 0.78, floodLevel: 0.93, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.LAGO_DE_CHAPALA, row: 9, name: "Lago de Chapala", capacity: 1500, normalLevel: 0.85, floodLevel: 0.98, currentLevel: 0.5  }
         ];
         
         reservoirs = calculatePositions(reservoirs, width, height);
