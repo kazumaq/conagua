@@ -398,12 +398,13 @@
             function updateReservoirs(date, data) {
                 reservoirs.forEach(reservoir => {
                     const reservoirData = data[reservoir.id];
-                    if (reservoirData && reservoirData.almacenaactual != null && reservoir.capacity > 0) {
+                    if (reservoirData && typeof reservoirData.almacenaactual === 'number' && reservoir.capacity > 0) {
                         reservoir.currentLevel = Math.min(Math.max(reservoirData.almacenaactual / reservoir.capacity, 0), 1);
                         reservoir.currentVolume = reservoirData.almacenaactual;
                     } else {
-                        reservoir.currentLevel = 0; // Default to 0 if no data available or invalid data
-                        reservoir.currentVolume = 0;
+                        // Keep the previous values if no new data is available
+                        reservoir.currentLevel = reservoir.currentLevel || 0;
+                        reservoir.currentVolume = reservoir.currentVolume || 0;
                     }
                 });
 
@@ -462,11 +463,9 @@
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
                     const data = await response.json();
-                    reservoir.capacity = data.namoalmac || 1; // Use 1 as fallback to avoid division by zero
-                    reservoir.normalLevel = (data.namoelev && data.elevcorona) ? data.namoelev / data.elevcorona : 0.8;
-                    reservoir.floodLevel = (data.nameelev && data.elevcorona) ? data.nameelev / data.elevcorona : 0.9;
+                    reservoir.capacity = data.namoalmac || 1; // Normal Maximum Operating Storage (use 1 as fallback to avoid division by zero)
                     reservoir.name = data.nombrecomun || reservoir.name; // Update reservoir name with official name
-                    console.log(`Reservoir ${reservoir.id}: capacity=${reservoir.capacity}, normalLevel=${reservoir.normalLevel}, floodLevel=${reservoir.floodLevel}, name=${reservoir.name}`);
+                    console.log(`Reservoir ${reservoir.id}: capacity=${reservoir.capacity}, name=${reservoir.name}`);
                 }
 
                 // Calculate max and min capacity
@@ -594,9 +593,16 @@
         document.getElementById("simulate").addEventListener("click", async () => {
             const startDate = document.getElementById("start-date").value;
             const endDate = document.getElementById("end-date").value;
+            const loadingIndicator = document.getElementById("loading");
 
             try {
+                loadingIndicator.style.display = "block";  // Show loading indicator
                 const simulationData = await fetchSimulationData(startDate, endDate);
+
+                if (Object.keys(simulationData).length === 0) {
+                    throw new Error("No data available for the selected date range.");
+                }
+
                 const dates = Object.keys(simulationData).sort();
                 let dateIndex = 0;
 
@@ -614,6 +620,8 @@
             } catch (error) {
                 console.error('Error in simulation:', error);
                 alert('Failed to run simulation. Please try again.');
+            } finally {
+                loadingIndicator.style.display = "none";  // Hide loading indicator
             }
         });
 
@@ -625,5 +633,8 @@
         initializeVisualization();
 
     </script>
+    <div id="loading" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: rgba(255,255,255,0.8); padding: 20px; border-radius: 5px;">
+        Loading simulation data...
+    </div>
 </body>
 </html>
