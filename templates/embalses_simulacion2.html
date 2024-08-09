@@ -400,8 +400,10 @@
                     const reservoirData = data[reservoir.id];
                     if (reservoirData && reservoirData.almacenaactual != null && reservoir.capacity > 0) {
                         reservoir.currentLevel = Math.min(Math.max(reservoirData.almacenaactual / reservoir.capacity, 0), 1);
+                        reservoir.currentVolume = reservoirData.almacenaactual;
                     } else {
                         reservoir.currentLevel = 0; // Default to 0 if no data available or invalid data
+                        reservoir.currentVolume = 0;
                     }
                 });
 
@@ -421,7 +423,7 @@
                 svg.selectAll(".data-group")
                     .data(reservoirs)
                     .select("text:nth-child(2)")
-                    .text(d => `${(d.currentLevel * d.capacity).toFixed(2)} hm³`);
+                    .text(d => `${d.currentVolume.toFixed(2)} hm³`);
 
                 d3.select("#current-date").text(date.toDateString());
             }
