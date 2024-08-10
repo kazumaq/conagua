@@ -34,11 +34,6 @@ def embalses_simulacion():
     # This function will handle the logic for your simulation page
     return render_template('embalses_simulacion.html')
 
-@app.route('/embalses/simulacion2')
-def embalses_simulacion2():
-    # This function will handle the logic for your simulation page
-    return render_template('embalses_simulacion2.html')
-
 @app.route('/api/states')
 def get_states():
     try:
