@@ -1,24 +1,665 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simulación de Cuencas</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <title>Advanced Watershed Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        #controls {
+            margin-bottom: 20px;
+        }
+        #visualization {
+            background-color: #e6f3ff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 20px;
+        }
+        .river {
+            fill: none;
+            stroke: #3498db;
+            stroke-width: 2;
+        }
+        .date-display {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .bucket {
+            fill: #f39c12;
+            stroke: #e67e22;
+            stroke-width: 2;
+        }
+        .water {
+            fill: #3498db;
+        }
+        .normal-level {
+            stroke: #27ae60;
+            stroke-width: 2;
+            stroke-dasharray: 5, 5;
+        }
+        .flood-level {
+            stroke: #e74c3c;
+            stroke-width: 2;
+            stroke-dasharray: 5, 5;
+        }
+        .reservoir-label {
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .level-label {
+            font-size: 12px;
+        }
+        .legend {
+            font-size: 14px;
+        }
+        #speed-control {
+            width: 200px;
+            margin-left: 10px;
+        }
+    </style>
 </head>
-
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-V5G35K4YFY"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-V5G35K4YFY');
-</script>
-
 <body>
-    <h1>Simulación de Cuencas</h1>
-    <p>Esta página está en desarrollo. Próximamente encontrarás aquí una herramienta para simular niveles de embalses en cuencas específicas.</p>
-    <a href="{{ url_for('embalses_main') }}">Volver a la página principal de Embalses</a>
+    <h1>Advanced Watershed Visualization</h1>
+    <div id="controls">
+        <label for="start-date">Start Date:</label>
+        <input type="date" id="start-date">
+        <label for="end-date">End Date:</label>
+        <input type="date" id="end-date">
+        <button id="simulate">Simulate</button>
+        <label for="speed-control">Animation Speed:</label>
+        <input type="range" id="speed-control" min="100" max="2000" step="100" value="1000">
+    </div>
+    <div class="date-display">Current Date: <span id="current-date"></span></div>
+    <div id="visualization"></div>
+
+    <script>
+        const width = 1500;
+        const height = 2000;
+        const svg = d3.select("#visualization")
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+        function fetchReservoirData(clavesih, startDate, endDate) {
+            return fetch(`/api/data/${clavesih}?start_date=${startDate}&end_date=${endDate}`)
+                .then(response => response.json())
+                .catch(error => console.error('Error fetching reservoir data:', error));
+        }
+
+        function calculatePositions(reservoirs, width, height) {
+            const margin = { top: 80, bottom: 50, left: 100, right: 100 }; // Increased top margin
+            const usableWidth = width - margin.left - margin.right;
+            const usableHeight = height - margin.top - margin.bottom;
+
+            // Group reservoirs by levels
+            const levels = {};
+            reservoirs.forEach(reservoir => {
+                if (!levels[reservoir.row]) {
+                    levels[reservoir.row] = [];
+                }
+                levels[reservoir.row].push(reservoir);
+            });
+
+            const maxLevel = Math.max(...Object.keys(levels).map(Number));
+
+            // Calculate vertical spacing
+            // Use only 70% of usable height to create more separation
+            const levelHeight = (usableHeight * 0.7) / (maxLevel + 1);
+
+            // Position reservoirs
+            Object.entries(levels).forEach(([level, levelReservoirs]) => {
+                const y = margin.top + level * levelHeight;
+                const reservoirWidth = usableWidth / (levelReservoirs.length + 1);
+
+                levelReservoirs.forEach((reservoir, index) => {
+                    reservoir.x = margin.left + (index + 1) * reservoirWidth;
+                    reservoir.y = y;
+                });
+            });
+
+            return reservoirs;
+        }
+
+        // Single source of truth for reservoir IDs
+        const RESERVOIR_IDS = {
+            JOSE_A_ALZATE: 'SBBMX',
+            IGNACIO_RAMIREZ: 'PIRMX',
+            TEPUXTEPEC: 'TEPMC',
+            JOSE_FABELA: 'PFBMX',
+            TERCER_MUNDO: 'TMUMC',
+            SOLIS: 'SLSGJ',
+            TEPETITLAN: 'TPTMX',
+            LAS_ADJUNTAS: 'VGRTP',
+            // TRES_GUERRAS_CELAYA: 'TGUCE', // Not found in the provided data, keeping original
+            PENUELAS: 'PNLGJ',
+            IGNACIO_ALLENDE: 'IALGJ',
+            COINTZIO: 'COIMC',
+            LAGUNA_DE_YURIRIA: 'LDYGJ',
+            LA_SOLEDAD: 'PRSGJ',
+            LA_PURISIMA: 'PRSGJ',
+            // SALAMANCA: 'SDLMD', // Not found in the provided data, keeping original
+            EL_PALOTE: 'EPLGJ',
+            LA_GOLONDRINA: 'GLNGJ',
+            // MARKAZUZA: 'MRKZB', // Not found in the provided data, keeping original
+            MARIANO_ABASOLO: 'MABGJ',
+            // CORRALES: 'CORRC', // Not found in the provided data, keeping original
+            LAGUNA_DE_FRESNO: 'LDFMC',
+            LA_POLVORA: 'POLJL',
+            YURECUARO: 'UREMC',
+            // LA_BARCA: 'BARCA', // Not found in the provided data, keeping original
+            DE_GONZALO: 'DGNMC',
+            UREPETIRO: 'UREMC',
+            GUARACHA: 'GUAMC',
+            JARIPO: 'JARMC',
+            COPANDARO: 'CPAMC',
+            LAGO_DE_CHAPALA: 'LDCJL'
+        };
+
+        // Sample data for reservoirs and rivers
+
+        let reservoirs = [
+            { id: RESERVOIR_IDS.TEPETITLAN, row: 0, name: "Tepetitlán", capacity: 400, normalLevel: 0.88, floodLevel: 0.99, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.JOSE_A_ALZATE, row: 0, name: "José A. Alzate", capacity: 1000, normalLevel: 0.8, floodLevel: 0.95, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.IGNACIO_RAMIREZ, row: 0, name: "Ignacio Ramírez", capacity: 500, normalLevel: 0.75, floodLevel: 0.9, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.JOSE_FABELA, row: 0, name: "José Fabela", capacity: 250, normalLevel: 0.7, floodLevel: 0.88, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.PENUELAS, row: 0, name: "Peñuelas", capacity: 450, normalLevel: 0.79, floodLevel: 0.94, currentLevel: 0.5  },
+
+            { id: RESERVOIR_IDS.TEPUXTEPEC, row: 1, name: "Tepuxtepec", capacity: 750, normalLevel: 0.85, floodLevel: 0.98, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.TERCER_MUNDO, row: 1, name: "Tercer Mundo", capacity: 300, normalLevel: 0.78, floodLevel: 0.93, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.LAS_ADJUNTAS, row: 1, name: "Las Adjuntas", capacity: 350, normalLevel: 0.76, floodLevel: 0.92, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.IGNACIO_ALLENDE, row: 1, name: "Ignacio Allende", capacity: 550, normalLevel: 0.81, floodLevel: 0.97, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.COINTZIO, row: 1, name: "Cointzio", capacity: 200, normalLevel: 0.72, floodLevel: 0.89, currentLevel: 0.5  },
+
+            { id: RESERVOIR_IDS.SOLIS, row: 2, name: "Solís", capacity: 600, normalLevel: 0.82, floodLevel: 0.96, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.LAGUNA_DE_YURIRIA, row: 2, name: "Laguna de Yuriria", capacity: 800, normalLevel: 0.86, floodLevel: 0.98, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.LA_SOLEDAD, row: 2, name: "La Soledad", capacity: 150, normalLevel: 0.74, floodLevel: 0.91, currentLevel: 0.5  },
+
+            { id: RESERVOIR_IDS.LA_PURISIMA, row: 3, name: "La Purísima", capacity: 700, normalLevel: 0.84, floodLevel: 0.96, currentLevel: 0.5  },
+
+            { id: RESERVOIR_IDS.EL_PALOTE, row: 4, name: "El Palote", capacity: 320, normalLevel: 0.77, floodLevel: 0.93, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.LA_GOLONDRINA, row: 4, name: "La Golondrina", capacity: 280, normalLevel: 0.75, floodLevel: 0.9, currentLevel: 0.5  },
+
+            { id: RESERVOIR_IDS.MARIANO_ABASOLO, row: 5, name: "Mariano Abasolo", capacity: 380, normalLevel: 0.8, floodLevel: 0.95, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.LAGUNA_DE_FRESNO, row: 5, name: "Laguna de Fresno", capacity: 420, normalLevel: 0.83, floodLevel: 0.97, currentLevel: 0.5  },
+
+            { id: RESERVOIR_IDS.LA_POLVORA, row: 6, name: "La Pólvora", capacity: 180, normalLevel: 0.71, floodLevel: 0.87, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.YURECUARO, row: 6, name: "Yurécuaro", capacity: 180, normalLevel: 0.71, floodLevel: 0.87, currentLevel: 0.5  },
+
+            { id: RESERVOIR_IDS.DE_GONZALO, row: 7, name: "De Gonzalo", capacity: 520, normalLevel: 0.82, floodLevel: 0.96, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.UREPETIRO, row: 7, name: "Urepetiro", capacity: 230, normalLevel: 0.73, floodLevel: 0.89, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.GUARACHA, row: 7, name: "Guaracha", capacity: 480, normalLevel: 0.79, floodLevel: 0.94, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.JARIPO, row: 7, name: "Jaripo", capacity: 270, normalLevel: 0.76, floodLevel: 0.92, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.COPANDARO, row: 7, name: "Copándaro", capacity: 340, normalLevel: 0.78, floodLevel: 0.93, currentLevel: 0.5  },
+            { id: RESERVOIR_IDS.LAGO_DE_CHAPALA, row: 9, name: "Lago de Chapala", capacity: 1500, normalLevel: 0.85, floodLevel: 0.98, currentLevel: 0.5  }
+        ];
+        
+        reservoirs = calculatePositions(reservoirs, width, height);
+
+        function updateReservoirStaticData(reservoirData) {
+            reservoirs.forEach(reservoir => {
+                const data = reservoirData.find(d => d.clavesih === reservoir.id);
+                if (data) {
+                    reservoir.capacity = data.namoalmac;
+                    reservoir.normalLevel = data.namoelev / data.elevcorona;
+                    reservoir.floodLevel = data.nameelev / data.elevcorona;
+                }
+            });
+            // Recalculate positions after updating data
+            reservoirs = calculatePositions(reservoirs, width, height);
+        }
+
+        let maxCapacity, minCapacity;
+
+        function calculateBucketSize(capacity) {
+            if (!maxCapacity || !minCapacity) {
+                maxCapacity = Math.max(...reservoirs.map(r => r.capacity));
+                minCapacity = Math.min(...reservoirs.map(r => r.capacity));
+            }
+            const minSize = 30;
+            const maxSize = 100;
+            const scale = d3.scaleLog()
+                .domain([Math.max(minCapacity, 1), maxCapacity]) // Ensure minimum domain value is at least 1
+                .range([minSize, maxSize]);
+            
+            return scale(Math.max(capacity, 1)); // Ensure minimum capacity is at least 1
+        }
+
+        const rivers = [
+            { source: RESERVOIR_IDS.JOSE_A_ALZATE, target: RESERVOIR_IDS.TEPUXTEPEC },
+            { source: RESERVOIR_IDS.IGNACIO_RAMIREZ, target: RESERVOIR_IDS.TEPUXTEPEC },
+            { source: RESERVOIR_IDS.TEPETITLAN, target: RESERVOIR_IDS.TEPUXTEPEC },
+            { source: RESERVOIR_IDS.JOSE_FABELA, target: RESERVOIR_IDS.TEPUXTEPEC },
+            { source: RESERVOIR_IDS.PENUELAS, target: RESERVOIR_IDS.IGNACIO_ALLENDE },
+
+            { source: RESERVOIR_IDS.TEPUXTEPEC, target: RESERVOIR_IDS.SOLIS },
+            { source: RESERVOIR_IDS.TERCER_MUNDO, target: RESERVOIR_IDS.SOLIS },
+            { source: RESERVOIR_IDS.LAS_ADJUNTAS, target: RESERVOIR_IDS.EL_PALOTE },//
+            { source: RESERVOIR_IDS.COINTZIO, target: RESERVOIR_IDS.LAGUNA_DE_YURIRIA },//
+            { source: RESERVOIR_IDS.IGNACIO_ALLENDE, target: RESERVOIR_IDS.LA_SOLEDAD },//
+
+            { source: RESERVOIR_IDS.LA_SOLEDAD, target: RESERVOIR_IDS.LA_PURISIMA },//
+            { source: RESERVOIR_IDS.LAGUNA_DE_YURIRIA, target: RESERVOIR_IDS.LA_PURISIMA },//
+            { source: RESERVOIR_IDS.SOLIS, target: RESERVOIR_IDS.EL_PALOTE },//
+
+            { source: RESERVOIR_IDS.LA_PURISIMA, target: RESERVOIR_IDS.EL_PALOTE },//
+
+            { source: RESERVOIR_IDS.EL_PALOTE, target: RESERVOIR_IDS.LA_GOLONDRINA },//
+            { source: RESERVOIR_IDS.LA_GOLONDRINA, target: RESERVOIR_IDS.MARIANO_ABASOLO },//
+
+            { source: RESERVOIR_IDS.MARIANO_ABASOLO, target: RESERVOIR_IDS.YURECUARO },//
+
+            { source: RESERVOIR_IDS.YURECUARO, target: RESERVOIR_IDS.LAGO_DE_CHAPALA },//
+            { source: RESERVOIR_IDS.LA_POLVORA, target: RESERVOIR_IDS.LAGO_DE_CHAPALA },//
+
+            { source: RESERVOIR_IDS.DE_GONZALO, target: RESERVOIR_IDS.LAGO_DE_CHAPALA },//
+            { source: RESERVOIR_IDS.UREPETIRO, target: RESERVOIR_IDS.LAGO_DE_CHAPALA },//
+            { source: RESERVOIR_IDS.GUARACHA, target: RESERVOIR_IDS.LAGO_DE_CHAPALA },//
+            { source: RESERVOIR_IDS.JARIPO, target: RESERVOIR_IDS.LAGO_DE_CHAPALA },//
+            { source: RESERVOIR_IDS.COPANDARO, target: RESERVOIR_IDS.LAGO_DE_CHAPALA }//
+        ];
+
+        // Draw rivers
+        svg.selectAll(".river")
+            .data(rivers)
+            .enter()
+            .append("path")
+            .attr("class", "river")
+            .attr("d", d => {
+                const source = reservoirs.find(r => r.id === d.source);
+                const target = reservoirs.find(r => r.id === d.target);
+                const midY = (source.y + target.y) / 2;
+                return `M${source.x},${source.y + 40} 
+                        C${source.x},${midY} 
+                        ${target.x},${midY} 
+                        ${target.x},${target.y - 40}`;
+            });
+
+        // Draw reservoirs as buckets
+        const bucketGroup = svg.selectAll(".bucket-group")
+            .data(reservoirs)
+            .enter()
+            .append("g")
+            .attr("class", "bucket-group")
+            .attr("transform", d => {
+                const bucketSize = calculateBucketSize(d.capacity);
+                return `translate(${d.x - bucketSize/2}, ${d.y - bucketSize/2})`;
+            });
+
+        bucketGroup.append("path")
+            .attr("class", "bucket")
+            .attr("d", d => {
+                const size = calculateBucketSize(d.capacity);
+                return `M0,0 L0,${size} A${size/4},5 0 0,0 ${size},${size} L${size},0 Z`;
+            });
+
+        const waterGroup = bucketGroup.append("g")
+            .attr("class", "water-group")
+            .attr("clip-path", d => `url(#bucket-clip-${d.id})`);
+
+        waterGroup.append("rect")
+            .attr("class", "water")
+            .attr("x", 0)
+            .attr("y", d => calculateBucketSize(d.capacity) * (1 - d.currentLevel))
+            .attr("width", d => calculateBucketSize(d.capacity))
+            .attr("height", d => calculateBucketSize(d.capacity) * d.currentLevel);
+
+        // Add normal and flood level lines
+        bucketGroup.append("line")
+            .attr("class", "normal-level")
+            .attr("x1", 0)
+            .attr("y1", d => calculateBucketSize(d.capacity) * (1 - d.normalLevel))
+            .attr("x2", d => calculateBucketSize(d.capacity))
+            .attr("y2", d => calculateBucketSize(d.capacity) * (1 - d.normalLevel));
+
+        bucketGroup.append("line")
+            .attr("class", "flood-level")
+            .attr("x1", 0)
+            .attr("y1", d => calculateBucketSize(d.capacity) * (1 - d.floodLevel))
+            .attr("x2", d => calculateBucketSize(d.capacity))
+            .attr("y2", d => calculateBucketSize(d.capacity) * (1 - d.floodLevel));
+
+        // Add reservoir labels and data
+        bucketGroup.append("text")
+            .attr("class", "reservoir-label")
+            .attr("x", d => calculateBucketSize(d.capacity) / 2)
+            .attr("y", d => -10)
+            .attr("text-anchor", "middle")
+            .text(d => d.name);
+
+        const dataGroup = bucketGroup.append("g")
+            .attr("class", "data-group")
+            .attr("transform", d => `translate(${calculateBucketSize(d.capacity) + 5}, 0)`);
+
+        dataGroup.append("text")
+            .attr("class", "level-label")
+            .attr("y", 20)
+            .text(d => `${(d.currentLevel * 100).toFixed(1)}%`);
+
+        dataGroup.append("text")
+            .attr("class", "level-label")
+            .attr("y", 40)
+            .text(d => `${(d.currentLevel * d.capacity).toFixed(2)} hm³`);
+
+        dataGroup.append("text")
+            .attr("class", "level-label")
+            .attr("y", 60)
+            .text(d => `Cap: ${d.capacity} hm³`);
+
+        // Create clip paths for the water
+        svg.append("defs")
+            .selectAll("clipPath")
+            .data(reservoirs)
+            .enter()
+            .append("clipPath")
+            .attr("id", d => `bucket-clip-${d.id}`)
+            .append("path")
+            .attr("d", d => {
+                const size = calculateBucketSize(d.capacity);
+                return `M0,0 L0,${size} A${size/4},5 0 0,0 ${size},${size} L${size},0 Z`;
+            });
+
+        // Add legend
+        const legend = svg.append("g")
+            .attr("class", "legend")
+            .attr("transform", "translate(20, 20)");
+
+        legend.append("line")
+            .attr("class", "normal-level")
+            .attr("x1", 0)
+            .attr("y1", 0)
+            .attr("x2", 30)
+            .attr("y2", 0);
+
+        legend.append("text")
+            .attr("x", 40)
+            .attr("y", 5)
+            .text("Normal Pool Elevation");
+
+        legend.append("line")
+            .attr("class", "flood-level")
+            .attr("x1", 0)
+            .attr("y1", 20)
+            .attr("x2", 30)
+            .attr("y2", 20);
+
+        legend.append("text")
+            .attr("x", 40)
+            .attr("y", 25)
+            .text("Maximum Flood Pool Level");
+
+            function updateReservoirs(date, data) {
+                reservoirs.forEach(reservoir => {
+                    const reservoirData = data[reservoir.id];
+                    if (reservoirData && typeof reservoirData.almacenaactual === 'number' && reservoir.capacity > 0) {
+                        reservoir.currentLevel = Math.min(Math.max(reservoirData.almacenaactual / reservoir.capacity, 0), 1);
+                        reservoir.currentVolume = reservoirData.almacenaactual;
+                    } else {
+                        // Keep the previous values if no new data is available
+                        reservoir.currentLevel = reservoir.currentLevel || 0;
+                        reservoir.currentVolume = reservoir.currentVolume || 0;
+                    }
+                });
+
+                svg.selectAll(".water-group")
+                    .data(reservoirs)
+                    .select(".water")
+                    .transition()
+                    .duration(500)
+                    .attr("y", d => calculateBucketSize(d.capacity) * (1 - d.currentLevel))
+                    .attr("height", d => calculateBucketSize(d.capacity) * d.currentLevel);
+
+                svg.selectAll(".data-group")
+                    .data(reservoirs)
+                    .select("text:nth-child(1)")
+                    .text(d => `${(d.currentLevel * 100).toFixed(1)}%`);
+
+                svg.selectAll(".data-group")
+                    .data(reservoirs)
+                    .select("text:nth-child(2)")
+                    .text(d => `${d.currentVolume.toFixed(2)} hm³`);
+
+                d3.select("#current-date").text(date.toDateString());
+            }
+
+            async function fetchSimulationData(startDate, endDate) {
+                const data = {};
+                for (const reservoir of reservoirs) {
+                    try {
+                        console.log(`Fetching data for reservoir ${reservoir.id} from ${startDate} to ${endDate}`);
+                        const response = await fetch(`/api/data/${reservoir.id}?start_date=${startDate}&end_date=${endDate}`);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        const reservoirData = await response.json();
+                        console.log(`Received ${reservoirData.length} data points for reservoir ${reservoir.id}`);
+                        if (reservoirData.length === 0) {
+                            console.warn(`No data received for reservoir ${reservoir.id}`);
+                        }
+                        reservoirData.forEach(point => {
+                            if (!data[point.fechamonitoreo]) {
+                                data[point.fechamonitoreo] = {};
+                            }
+                            data[point.fechamonitoreo][reservoir.id] = point;
+                        });
+                    } catch (error) {
+                        console.error(`Error fetching data for reservoir ${reservoir.id}:`, error);
+                    }
+                }
+                console.log(`Total dates with data: ${Object.keys(data).length}`);
+                return data;
+            }
+
+        let animationSpeed = 1000;
+        let animationTimer;
+
+        async function initializeVisualization() {
+            try {
+                // Fetch static data for each reservoir
+                for (let reservoir of reservoirs) {
+                    const response = await fetch(`/api/reservoir/${reservoir.id}`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const data = await response.json();
+                    reservoir.capacity = data.namoalmac || 1; // Normal Maximum Operating Storage (use 1 as fallback to avoid division by zero)
+                    reservoir.name = data.nombrecomun || reservoir.name; // Update reservoir name with official name
+                    console.log(`Reservoir ${reservoir.id}: capacity=${reservoir.capacity}, name=${reservoir.name}`);
+                }
+
+                // Calculate max and min capacity
+                maxCapacity = Math.max(...reservoirs.map(r => r.capacity));
+                minCapacity = Math.min(...reservoirs.map(r => r.capacity));
+
+                // Recalculate positions and redraw visualization
+                reservoirs = calculatePositions(reservoirs, width, height);
+                
+                // Redraw rivers
+                svg.selectAll(".river").remove();
+                svg.selectAll(".river")
+                    .data(rivers)
+                    .enter()
+                    .append("path")
+                    .attr("class", "river")
+                    .attr("d", d => {
+                        const source = reservoirs.find(r => r.id === d.source);
+                        const target = reservoirs.find(r => r.id === d.target);
+                        const midY = (source.y + target.y) / 2;
+                        return `M${source.x},${source.y + 40} 
+                                C${source.x},${midY} 
+                                ${target.x},${midY} 
+                                ${target.x},${target.y - 40}`;
+                    });
+
+                // Redraw reservoirs
+                svg.selectAll(".bucket-group").remove();
+                const bucketGroup = svg.selectAll(".bucket-group")
+                    .data(reservoirs)
+                    .enter()
+                    .append("g")
+                    .attr("class", "bucket-group")
+                    .attr("transform", d => {
+                        const bucketSize = calculateBucketSize(d.capacity);
+                        return `translate(${d.x - bucketSize/2}, ${d.y - bucketSize/2})`;
+                    });
+
+                bucketGroup.append("path")
+                    .attr("class", "bucket")
+                    .attr("d", d => {
+                        const size = calculateBucketSize(d.capacity);
+                        return `M0,0 L0,${size} A${size/4},5 0 0,0 ${size},${size} L${size},0 Z`;
+                    });
+
+                const waterGroup = bucketGroup.append("g")
+                    .attr("class", "water-group")
+                    .attr("clip-path", d => `url(#bucket-clip-${d.id})`);
+
+                waterGroup.append("rect")
+                    .attr("class", "water")
+                    .attr("x", 0)
+                    .attr("y", d => calculateBucketSize(d.capacity))
+                    .attr("width", d => calculateBucketSize(d.capacity))
+                    .attr("height", 0);
+
+                // Update the normal and flood level lines
+                bucketGroup.append("line")
+                    .attr("class", "normal-level")
+                    .attr("x1", 0)
+                    .attr("y1", d => calculateBucketSize(d.capacity) * (1 - Math.min(Math.max(d.normalLevel, 0), 1)))
+                    .attr("x2", d => calculateBucketSize(d.capacity))
+                    .attr("y2", d => calculateBucketSize(d.capacity) * (1 - Math.min(Math.max(d.normalLevel, 0), 1)));
+
+                bucketGroup.append("line")
+                    .attr("class", "flood-level")
+                    .attr("x1", 0)
+                    .attr("y1", d => calculateBucketSize(d.capacity) * (1 - Math.min(Math.max(d.floodLevel, 0), 1)))
+                    .attr("x2", d => calculateBucketSize(d.capacity))
+                    .attr("y2", d => calculateBucketSize(d.capacity) * (1 - Math.min(Math.max(d.floodLevel, 0), 1)));
+
+                // Add reservoir labels and data
+                bucketGroup.append("text")
+                    .attr("class", "reservoir-label")
+                    .attr("x", d => calculateBucketSize(d.capacity) / 2)
+                    .attr("y", d => -10)
+                    .attr("text-anchor", "middle")
+                    .text(d => d.name);
+
+                const dataGroup = bucketGroup.append("g")
+                    .attr("class", "data-group")
+                    .attr("transform", d => `translate(${calculateBucketSize(d.capacity) + 5}, 0)`);
+
+                dataGroup.append("text")
+                    .attr("class", "level-label")
+                    .attr("y", 20)
+                    .text("0%");
+
+                dataGroup.append("text")
+                    .attr("class", "level-label")
+                    .attr("y", 40)
+                    .text("0 hm³");
+
+                dataGroup.append("text")
+                    .attr("class", "level-label")
+                    .attr("y", 60)
+                    .text(d => `Cap: ${d.capacity.toFixed(2)} hm³`);
+
+                // Create clip paths for the water
+                svg.append("defs")
+                    .selectAll("clipPath")
+                    .data(reservoirs)
+                    .enter()
+                    .append("clipPath")
+                    .attr("id", d => `bucket-clip-${d.id}`)
+                    .append("path")
+                    .attr("d", d => {
+                        const size = calculateBucketSize(d.capacity);
+                        return `M0,0 L0,${size} A${size/4},5 0 0,0 ${size},${size} L${size},0 Z`;
+                    });
+
+                // Set up date inputs with default values
+                const today = new Date();
+                const oneMonthAgo = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+                
+                document.getElementById('start-date').value = oneMonthAgo.toISOString().split('T')[0];
+                document.getElementById('end-date').value = today.toISOString().split('T')[0];
+
+            } catch (error) {
+                console.error('Error initializing visualization:', error);
+                alert('Failed to initialize visualization. Please refresh the page.');
+            }
+
+            // Start the simulation immediately after initialization
+            const startDate = document.getElementById("start-date").value;
+            const endDate = document.getElementById("end-date").value;
+            console.log(`Attempting to start simulation from ${startDate} to ${endDate}`);
+            const simulationData = await fetchSimulationData(startDate, endDate);
+            if (Object.keys(simulationData).length > 0) {
+                console.log("Data received, starting simulation");
+                startSimulation();
+            } else {
+                console.error("No data available for simulation");
+                alert("No data available for the selected date range. Please try different dates.");
+            }
+        }
+        async function startSimulation() {
+            const startDate = document.getElementById("start-date").value;
+            const endDate = document.getElementById("end-date").value;
+            const loadingIndicator = document.getElementById("loading");
+
+            try {
+                loadingIndicator.style.display = "block";
+                console.log(`Starting simulation from ${startDate} to ${endDate}`);
+                const simulationData = await fetchSimulationData(startDate, endDate);
+
+                console.log(`Received simulation data:`, simulationData);
+
+                if (Object.keys(simulationData).length === 0) {
+                    throw new Error("No data available for the selected date range.");
+                }
+
+                const dates = Object.keys(simulationData).sort();
+                console.log(`Simulation dates: ${dates[0]} to ${dates[dates.length - 1]}`);
+                let dateIndex = 0;
+
+                function simulateDay() {
+                    if (dateIndex < dates.length) {
+                        const currentDate = dates[dateIndex];
+                        console.log(`Simulating date: ${currentDate}`);
+                        updateReservoirs(new Date(currentDate), simulationData[currentDate]);
+                        dateIndex++;
+                        animationTimer = setTimeout(simulateDay, animationSpeed);
+                    } else {
+                        console.log("Simulation complete");
+                    }
+                }
+
+                clearTimeout(animationTimer);
+                simulateDay();
+            } catch (error) {
+                console.error('Error in simulation:', error);
+                alert('Failed to run simulation. Please try again.');
+            } finally {
+                loadingIndicator.style.display = "none";
+            }
+        }
+        document.getElementById("simulate").addEventListener("click", startSimulation);
+        document.getElementById("speed-control").addEventListener("input", (event) => {
+            animationSpeed = 2100 - parseInt(event.target.value);
+        });
+
+        // Call initializeVisualization when the page loads
+        initializeVisualization();
+
+    </script>
+    <div id="loading" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: rgba(255,255,255,0.8); padding: 20px; border-radius: 5px;">
+        Loading simulation data...
+    </div>
 </body>
 </html>
