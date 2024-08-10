@@ -82,26 +82,10 @@ function updateChartLanguage() {
     }
 }
 
-// Initialize the application
-function init() {
-    console.log("Initializing application...");
-    fetchStates().then(() => {
-        // Check if the default reservoir exists
-        const reservoirSelect = document.getElementById('reservoirSelect');
-        const defaultReservoirOption = Array.from(reservoirSelect.options).find(option => option.value === defaultReservoir);
-        if (!defaultReservoirOption) {
-            console.warn(`Default reservoir ${defaultReservoir} not found in the list. Using the first available reservoir.`);
-            defaultReservoir = reservoirSelect.options[0].value;
-        }
-        loadReservoirData(defaultReservoir);
-    });
-    document.getElementById('languageSelect').addEventListener('change', (e) => changeLanguage(e.target.value));
-}
-
 // Fetch list of states
 function fetchStates() {
     console.log("Fetching states...");
-    fetch('/api/states')
+    return fetch('/api/states')
         .then(response => {
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             return response.json();
@@ -109,50 +93,107 @@ function fetchStates() {
         .then(states => {
             console.log("States retrieved:", states);
             populateSelect('stateSelect', states, defaultState);
-            fetchReservoirs(defaultState);
+            return defaultState;
         })
         .catch(error => {
             console.error('Error fetching states:', error);
             alert(translations[currentLanguage].errorFetchingStates);
+            throw error;
         });
+}
+
+// Initialize the application
+function init() {
+    console.log("Initializing application...");
+    // Set default dates
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - 1);
+    
+    document.getElementById('startDate').value = formatDate(startDate);
+    document.getElementById('endDate').value = formatDate(endDate);
+
+    fetchStates()
+        .then(fetchReservoirs)
+        .then(loadReservoirData)
+        .catch(error => {
+            console.error('Error initializing application:', error);
+        });
+
+    document.getElementById('languageSelect').addEventListener('change', (e) => changeLanguage(e.target.value));
 }
 
 // Fetch reservoirs for a given state
 function fetchReservoirs(state) {
     console.log(`Fetching reservoirs for state: ${state}`);
-    fetch(`/api/reservoirs/${state}`)
+    return fetch(`/api/reservoirs/${state}`)
         .then(response => response.json())
         .then(reservoirs => {
             console.log(`Retrieved ${reservoirs.length} reservoirs for ${state}`);
             populateSelect('reservoirSelect', reservoirs.map(r => ({ value: r.clavesih, text: `${r.nombrecomun} (${r.clavesih})` })), defaultReservoir);
-            loadReservoirData(defaultReservoir);
+            
+            // Check if the default reservoir exists
+            const reservoirSelect = document.getElementById('reservoirSelect');
+            const defaultReservoirOption = Array.from(reservoirSelect.options).find(option => option.value === defaultReservoir);
+            if (!defaultReservoirOption) {
+                console.warn(`Default reservoir ${defaultReservoir} not found in the list. Using the first available reservoir.`);
+                defaultReservoir = reservoirSelect.options[0].value;
+            }
+            
+            return defaultReservoir;
         })
         .catch(error => {
             console.error(translations[currentLanguage].errorFetchingReservoirs, error);
+            throw error;
         });
 }
 
 // Load and display reservoir data
 function loadReservoirData(clavesih) {
     console.log(`Loading data for reservoir: ${clavesih}`);
-    fetch(`/api/data/${clavesih}`)
-        .then(response => {
-            console.log(`Response status: ${response.status}`);
-            return response.json();
-        })
-        .then(data => {
-            console.log(`Retrieved data for reservoir ${clavesih}:`, data);
-            if (data.length === 0) {
-                console.warn(`No data received for reservoir ${clavesih}`);
-                return;
-            }
-            currentData = data;
-            processReservoirData(data);
-        })
-        .catch(error => {
-            console.error(`Error loading data for reservoir ${clavesih}:`, error);
-        });
-});
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    console.log(`Date range: ${startDate} to ${endDate}`);
+
+    // Add a small delay to ensure DOM is updated
+    setTimeout(() => {
+        fetch(`/api/data/${clavesih}?start_date=${startDate}&end_date=${endDate}`)
+            .then(response => {
+                console.log(`Response status: ${response.status}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log(`Retrieved ${data.length} data points for reservoir ${clavesih}`);
+                if (data.length === 0) {
+                    console.warn(`No data received for reservoir ${clavesih}`);
+                    displayNoDataMessage();
+                    return;
+                }
+                currentData = data;
+                processReservoirData(data);
+            })
+            .catch(error => {
+                console.error(`Error loading data for reservoir ${clavesih}:`, error);
+                displayErrorMessage(error);
+            });
+    }, 100);
+}
+
+function displayNoDataMessage() {
+    const chartContainer = document.getElementById('reservoirChart');
+    chartContainer.innerHTML = '<p>No data available for the selected date range.</p>';
+    const latestDataDiv = document.getElementById('latestData');
+    latestDataDiv.innerHTML = '<p>No current data available.</p>';
+}
+
+function displayErrorMessage(error) {
+    const chartContainer = document.getElementById('reservoirChart');
+    chartContainer.innerHTML = `<p>Error loading data: ${error.message}</p>`;
+    const latestDataDiv = document.getElementById('latestData');
+    latestDataDiv.innerHTML = '<p>Error loading latest data.</p>';
 }
 
 // Process and display reservoir data
