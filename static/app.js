@@ -248,10 +248,24 @@ function createOrUpdateChart(data) {
     const volumes = data.map(d => d.almacenaactual);
     const percentages = data.map(d => d.fill_percentage);
 
+    // Calculate the range for the percentage axis
+    const maxPercentage = Math.max(...percentages);
+    const minPercentage = Math.min(...percentages);
+    const percentageBuffer = (maxPercentage - minPercentage) * 0.1; // 10% buffer
+
+    // Determine the y-axis-2 (percentage) range
+    const yAxis2Min = Math.max(0, minPercentage - percentageBuffer);
+    const yAxis2Max = maxPercentage + percentageBuffer;
+
     if (chart) {
         chart.data.labels = dates;
         chart.data.datasets[0].data = volumes;
         chart.data.datasets[1].data = percentages;
+
+        // Update the percentage axis range
+        chart.options.scales['y-axis-2'].min = yAxis2Min;
+        chart.options.scales['y-axis-2'].max = yAxis2Max;
+
         chart.update();
     } else {
         chart = new Chart(ctx, {
@@ -299,8 +313,8 @@ function createOrUpdateChart(data) {
                             display: true,
                             text: `${translations[currentLanguage].percentage} (%)`
                         },
-                        min: 0,
-                        max: Math.max(100, Math.ceil(Math.max(...percentages))),
+                        min: yAxis2Min,
+                        max: yAxis2Max,
                         grid: {
                             drawOnChartArea: false
                         }
