@@ -151,8 +151,10 @@ function fetchReservoirs(state) {
 // Load and display reservoir data
 function loadReservoirData(clavesih) {
     console.log(`Loading data for reservoir: ${clavesih}`);
-    const startDate = document.getElementById('startDate').value;
+
+    const startDate = '1991-01-01';
     const endDate = document.getElementById('endDate').value;
+
     console.log(`Date range: ${startDate} to ${endDate}`);
 
     // Add a small delay to ensure DOM is updated
@@ -167,6 +169,8 @@ function loadReservoirData(clavesih) {
             })
             .then(data => {
                 console.log(`Retrieved ${data.length} data points for reservoir ${clavesih}`);
+                console.log(`First data point: ${JSON.stringify(data[0])}`);
+                console.log(`Last data point: ${JSON.stringify(data[data.length - 1])}`);
                 if (data.length === 0) {
                     console.warn(`No data received for reservoir ${clavesih}`);
                     displayNoDataMessage();
@@ -212,9 +216,9 @@ function processReservoirData(data) {
 
     console.log(`Full date range: ${fullStartDate.toISOString()} to ${fullEndDate.toISOString()}`);
 
-    // Set default range to last year or full range if less than a year of data
+    // Set default range to last month
     let defaultStartDate = new Date(fullEndDate);
-    defaultStartDate.setFullYear(defaultStartDate.getFullYear() - 1);
+    defaultStartDate.setMonth(defaultStartDate.getMonth() - 1);
     if (defaultStartDate < fullStartDate) defaultStartDate = fullStartDate;
 
     // Update date range inputs
@@ -231,6 +235,7 @@ function processReservoirData(data) {
     endDateInput.max = formatDate(fullEndDate);
 
     console.log(`Date inputs set: start=${startDateInput.value}, end=${endDateInput.value}`);
+    console.log(`Full date range available: ${formatDate(fullStartDate)} to ${formatDate(fullEndDate)}`);
 
     updateChart(data.filter(d => new Date(d.fechamonitoreo) >= defaultStartDate));
     displayLatestData(data[data.length - 1]);
@@ -248,10 +253,24 @@ function createOrUpdateChart(data) {
     const volumes = data.map(d => d.almacenaactual);
     const percentages = data.map(d => d.fill_percentage);
 
+    // Calculate the range for the percentage axis
+    const maxPercentage = Math.max(...percentages);
+    const minPercentage = Math.min(...percentages);
+    const percentageBuffer = (maxPercentage - minPercentage) * 0.1; // 10% buffer
+
+    // Determine the y-axis-2 (percentage) range
+    const yAxis2Min = Math.max(0, minPercentage - percentageBuffer);
+    const yAxis2Max = maxPercentage + percentageBuffer;
+
     if (chart) {
         chart.data.labels = dates;
         chart.data.datasets[0].data = volumes;
         chart.data.datasets[1].data = percentages;
+
+        // Update the percentage axis range
+        chart.options.scales['y-axis-2'].min = yAxis2Min;
+        chart.options.scales['y-axis-2'].max = yAxis2Max;
+
         chart.update();
     } else {
         chart = new Chart(ctx, {
@@ -299,8 +318,8 @@ function createOrUpdateChart(data) {
                             display: true,
                             text: `${translations[currentLanguage].percentage} (%)`
                         },
-                        min: 0,
-                        max: Math.max(100, Math.ceil(Math.max(...percentages))),
+                        min: yAxis2Min,
+                        max: yAxis2Max,
                         grid: {
                             drawOnChartArea: false
                         }
