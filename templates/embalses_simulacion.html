@@ -409,7 +409,7 @@
                 reservoirs.forEach(reservoir => {
                     const reservoirData = data[reservoir.id];
                     if (reservoirData && typeof reservoirData.almacenaactual === 'number' && reservoir.capacity > 0) {
-                        reservoir.currentLevel = Math.min(Math.max(reservoirData.almacenaactual / reservoir.capacity, 0), 1);
+                        reservoir.currentLevel = Math.max(reservoirData.almacenaactual / reservoir.capacity, 0);
                         reservoir.currentVolume = reservoirData.almacenaactual;
                     } else {
                         // Keep the previous values if no new data is available
