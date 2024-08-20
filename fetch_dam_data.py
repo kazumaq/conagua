@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import time
 import logging
 from tqdm import tqdm
+import argparse
 
 # Set up logging to both file and console
 def setup_logging():
@@ -74,8 +75,8 @@ def process_date(date):
         logger.info(f"No data found for {date_str}")
         return False, True  # No data found, but API was called
 
-def main():
-    current_date = datetime.now().date()
+def main(start_date, all_dates):
+    current_date = start_date
     days_processed = 0
     days_with_data = 0
     api_calls = 0
@@ -99,13 +100,33 @@ def main():
                 'API Calls': api_calls
             })
 
+            if not all_dates:
+                break
+
             current_date -= timedelta(days=1)
             if api_called:
                 time.sleep(0.25)  # Only wait if an API call was made
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Fetch dam data for specific dates.")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--today", action="store_true", help="Fetch data for today (default)")
+    group.add_argument("--date", type=str, help="Fetch data for a specific date (YYYY-MM-DD)")
+    parser.add_argument("--all", action="store_true", help="Fetch all dates starting from the specified date or today")
+
+    args = parser.parse_args()
+
+    if args.date:
+        try:
+            start_date = datetime.strptime(args.date, "%Y-%m-%d").date()
+        except ValueError:
+            print("Invalid date format. Please use YYYY-MM-DD.")
+            exit(1)
+    else:
+        start_date = datetime.now().date()
+
     try:
-        main()
+        main(start_date, args.all)
     except KeyboardInterrupt:
         logger.info("Script stopped by user.")
         print("\nScript stopped by user. Check dam_data_fetch.log for full details.")
