@@ -11,6 +11,15 @@ from logger_config import setup_logging
 
 logger = setup_logging(__name__)
 
+def test_connection():
+    try:
+        response = requests.get('https://sinav30.conagua.gob.mx:8080', timeout=10)
+        logger.info(f"Connection test result: Status code {response.status_code}")
+        return response.status_code == 200
+    except requests.RequestException as e:
+        logger.error(f"Connection test failed: {str(e)}")
+        return False
+
 def get_dam_report(date):
     url = f'https://sinav30.conagua.gob.mx:8080/PresasPG/presas/reporte/{date}'
     try:
@@ -135,9 +144,18 @@ if __name__ == "__main__":
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--today", action="store_true", help="Fetch data for today (default)")
     group.add_argument("--date", type=str, help="Fetch data for a specific date (YYYY-MM-DD)")
+    parser.add_argument("--test", action="store_true", help="Test connection to the server")
     parser.add_argument("--all", action="store_true", help="Fetch all dates starting from the specified date or today")
 
     args = parser.parse_args()
+
+    if args.test:
+        if test_connection():
+            logger.info("Connection test successful")
+            sys.exit(0)
+        else:
+            logger.error("Connection test failed")
+            sys.exit(1)
 
     if args.date:
         try:
