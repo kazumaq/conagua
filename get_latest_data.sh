@@ -47,8 +47,21 @@ cleanup() {
 
 trap cleanup EXIT
 
+# Navigate to the project directory
 cd /repositories/conagua
+
+# Activate virtual environment
 source myenv/bin/activate
+
+# Test connection
+log "Testing connection to CONAGUA server"
+if python fetch_dam_data.py --test; then
+    log "Connection test successful"
+else
+    log "Connection test failed. Check server status and network connection."
+    deactivate
+    exit 1
+fi
 
 log "Starting fetch_dam_data.py"
 if python fetch_dam_data.py; then
@@ -67,4 +80,6 @@ else
 fi
 
 log "All scripts completed successfully"
+
+# Deactivate virtual environment
 deactivate
