@@ -51,12 +51,17 @@ cd /repositories/conagua
 source myenv/bin/activate
 
 log "Starting fetch_dam_data.py"
-if python fetch_dam_data.py >> "$LOG_FILE" 2>&1; then
+if python fetch_dam_data.py; then
     log "fetch_dam_data.py succeeded, running preprocessing.py"
     python preprocessing.py dam_data >> "$LOG_FILE" 2>&1
     log "preprocessing.py completed"
 else
-    log "fetch_dam_data.py failed or no new data, not running preprocessing.py"
+    exit_code=$?
+    log "fetch_dam_data.py failed with exit code $exit_code. Check the log file for more details."
+    log "Last 20 lines of the log file:"
+    tail -n 20 "$LOG_FILE" | while IFS= read -r line; do
+        log "    $line"
+    done
     deactivate
     exit 1
 fi

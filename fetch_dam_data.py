@@ -3,10 +3,10 @@ import json
 import os
 from datetime import datetime, timedelta
 import time
-import sys
+import logging
 from tqdm import tqdm
 import argparse
-
+import sys
 from logger_config import setup_logging
 
 logger = setup_logging(__name__)
@@ -15,44 +15,77 @@ def get_dam_report(date):
     url = f'https://sinav30.conagua.gob.mx:8080/PresasPG/presas/reporte/{date}'
     try:
         response = requests.get(url, timeout=10)
-        return response.json() if response.status_code == 200 and response.json() else None
-    except (requests.RequestException, ValueError):
+        if response.status_code == 200:
+            return response.json() if response.json() else None
+        else:
+            logger.error(f"Failed to fetch data. Status code: {response.status_code}")
+            logger.error(f"Response content: {response.text}")
+            return None
+    except requests.RequestException as e:
+        logger.error(f"Request exception occurred: {str(e)}")
+        return None
+    except ValueError as e:
+        logger.error(f"JSON decoding failed: {str(e)}")
         return None
 
 def save_data(data, date):
     folder = 'dam_data'
     os.makedirs(folder, exist_ok=True)
     filename = os.path.join(folder, f'{date}.json')
-    with open(filename, 'w') as f:
-        json.dump(data, f, indent=2)
+    try:
+        with open(filename, 'w') as f:
+            json.dump(data, f, indent=2)
+        logger.info(f"Data saved successfully to {filename}")
+    except IOError as e:
+        logger.error(f"Failed to save data to {filename}: {str(e)}")
+        raise
 
 def is_valid_data(data):
-    return isinstance(data, list) and len(data) > 0 and all(isinstance(item, dict) for item in data)
+    if not isinstance(data, list):
+        logger.error("Data is not a list")
+        return False
+    if len(data) == 0:
+        logger.error("Data list is empty")
+        return False
+    if not all(isinstance(item, dict) for item in data):
+        logger.error("Not all items in the data list are dictionaries")
+        return False
+    return True
 
 def load_cached_data(filename):
     try:
         with open(filename, 'r') as f:
             data = json.load(f)
-        return data if is_valid_data(data) else None
-    except (json.JSONDecodeError, FileNotFoundError):
+        if is_valid_data(data):
+            return data
+        else:
+            logger.error(f"Invalid data structure in cached file: {filename}")
+            return None
+    except FileNotFoundError:
+        logger.info(f"Cached file not found: {filename}")
+        return None
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON decoding error in cached file {filename}: {str(e)}")
         return None
 
 def process_date(date):
     date_str = date.strftime('%Y-%m-%d')
     filename = os.path.join('dam_data', f'{date_str}.json')
     
-    # Check cache first
     cached_data = load_cached_data(filename)
     if cached_data:
         logger.info(f"Using cached data for {date_str}")
         return True, False  # Data found, but not freshly fetched
     
-    # If not in cache or invalid, fetch from API
     data = get_dam_report(date_str)
     if data:
-        save_data(data, date_str)
-        logger.info(f"Data fetched and saved for {date_str}")
-        return True, True  # Data found and freshly fetched
+        if is_valid_data(data):
+            save_data(data, date_str)
+            logger.info(f"Data fetched and saved for {date_str}")
+            return True, True  # Data found and freshly fetched
+        else:
+            logger.error(f"Invalid data structure received for {date_str}")
+            return False, True
     else:
         logger.info(f"No data found for {date_str}")
         return False, True  # No data found, but API was called
@@ -71,11 +104,10 @@ def main(start_date, all_dates):
             if data_found:
                 days_with_data += 1
                 
-            if api_called and data_found:
-                fresh_data_fetched = True
-            
             if api_called:
                 api_calls += 1
+                if data_found:
+                    fresh_data_fetched = True
             days_processed += 1
             
             pbar.update(1)
@@ -93,7 +125,10 @@ def main(start_date, all_dates):
             if api_called:
                 time.sleep(0.25)  # Only wait if an API call was made
 
-    return fresh_data_fetched
+    if not fresh_data_fetched:
+        logger.warning("No fresh data was fetched. All data was from cache or no data was found.")
+        return 1
+    return 0
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fetch dam data for specific dates.")
@@ -108,20 +143,18 @@ if __name__ == "__main__":
         try:
             start_date = datetime.strptime(args.date, "%Y-%m-%d").date()
         except ValueError:
-            print("Invalid date format. Please use YYYY-MM-DD.")
-            exit(1)
+            logger.error("Invalid date format. Please use YYYY-MM-DD.")
+            sys.exit(1)
     else:
         start_date = datetime.now().date()
 
     try:
-        fresh_data_fetched = main(start_date, args.all)
-        if fresh_data_fetched:
-            logger.info("Fresh data was fetched from the API.")
-            sys.exit(0)  # Exit with 0 if fresh data was fetched
-        else:
-            logger.info("No fresh data was fetched. Used cached data.")
-            sys.exit(1)  # Exit with 1 if only cached data was used
+        exit_code = main(start_date, args.all)
+        sys.exit(exit_code)
     except KeyboardInterrupt:
         logger.info("Script stopped by user.")
         print("\nScript stopped by user. Check dam_data_fetch.log for full details.")
+        sys.exit(1)
+    except Exception as e:
+        logger.exception("An unexpected error occurred:")
         sys.exit(1)
