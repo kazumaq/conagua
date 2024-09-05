@@ -1,1 +1,1 @@
-0 0 * * * /repositories/conagua/get_latest_data.sh
+*/15 11-21 * * * /repositories/conagua/get_latest_data.sh
