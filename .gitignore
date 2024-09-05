@@ -3,3 +3,4 @@ dam_data_fetch.log
 myenv/*
 .DS_Store
 repo.*
+__pycache__/

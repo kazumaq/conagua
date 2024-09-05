@@ -1,8 +1,8 @@
-# logger_config.py
-
 import logging
+import os
 
-LOG_FILE = '/repositories/conagua/conagua_unified.log'
+# Get log file path from environment variable, or use a default
+LOG_FILE = os.environ.get('CONAGUA_LOG_FILE', os.path.join(os.getcwd(), 'conagua_unified.log'))
 
 def setup_logging(name):
     logger = logging.getLogger(name)
@@ -10,6 +10,9 @@ def setup_logging(name):
 
     # Check if logger already has handlers to avoid duplicate logging
     if not logger.handlers:
+        # Ensure the directory for the log file exists
+        os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+
         # File handler
         file_handler = logging.FileHandler(LOG_FILE)
         file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
