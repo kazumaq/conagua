@@ -3,6 +3,11 @@ import time
 from datetime import datetime, timedelta
 import random
 
+
+from logger_config import setup_logging
+
+logger = setup_logging(__name__)
+
 def get_dam_report(date):
     url = f'https://sinav30.conagua.gob.mx:8080/PresasPG/presas/reporte/{date}'
     try:

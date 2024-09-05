@@ -1,15 +1,24 @@
 #!/bin/bash
 set -e
 
-# Lock file
+# Lock file and Log file
 LOCK_FILE="/tmp/conagua_script.lock"
-# Maximum age of lock file in seconds (2 hours)
+LOG_FILE="/repositories/conagua/conagua_unified.log"
 MAX_LOCK_AGE=$((2 * 60 * 60))
 
 # Function for logging
 log() {
-    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1"
+    local message="[$(date +'%Y-%m-%d %H:%M:%S')] BASH - $1"
+    echo "$message" >> "$LOG_FILE"
+    echo "$message"  
 }
+
+# Rotate log file if it's larger than 10MB
+if [ -f "$LOG_FILE" ] && [ $(du -m "$LOG_FILE" | cut -f1) -gt 10 ]; then
+    mv "$LOG_FILE" "${LOG_FILE}.$(date +'%Y%m%d_%H%M%S')"
+    touch "$LOG_FILE"
+    log "Log file rotated due to size"
+fi
 
 # Function to check and remove stale lock file
 check_stale_lock() {
@@ -22,48 +31,35 @@ check_stale_lock() {
     fi
 }
 
-# Check for stale lock and remove if necessary
 check_stale_lock
 
-# Check if the script is already running
 if [ -f "$LOCK_FILE" ]; then
     log "Script is already running. Exiting."
     exit 1
 fi
 
-# Create lock file
 touch "$LOCK_FILE"
 
-# Function to remove lock file on exit
 cleanup() {
     log "Cleaning up..."
     rm -f "$LOCK_FILE"
 }
 
-# Set up trap to ensure cleanup happens even if script fails
 trap cleanup EXIT
 
-# Navigate to the directory containing the script
 cd /repositories/conagua
-
-# Activate virtual environment
 source myenv/bin/activate
 
-# Run the first script (fetch_dam_data.py)
 log "Starting fetch_dam_data.py"
-if python fetch_dam_data.py; then
+if python fetch_dam_data.py >> "$LOG_FILE" 2>&1; then
     log "fetch_dam_data.py succeeded, running preprocessing.py"
-    python preprocessing.py dam_data
+    python preprocessing.py dam_data >> "$LOG_FILE" 2>&1
     log "preprocessing.py completed"
 else
     log "fetch_dam_data.py failed or no new data, not running preprocessing.py"
-    deactivate  # Deactivate virtual environment before exiting
+    deactivate
     exit 1
 fi
 
 log "All scripts completed successfully"
-
-# Deactivate virtual environment
 deactivate
-
-# Lock file will be automatically removed by the cleanup function

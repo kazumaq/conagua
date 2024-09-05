@@ -3,9 +3,10 @@ import sqlite3
 import os
 from datetime import datetime
 import sys
-import logging
 
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+from logger_config import setup_logging
+
+logger = setup_logging(__name__)
 
 def create_and_fill_databases(input_directory):
     try:
@@ -25,14 +26,14 @@ def create_and_fill_databases(input_directory):
         if not json_files:
             raise ValueError(f"No JSON files found in {input_directory}")
 
-        logging.info(f"Found {len(json_files)} JSON files")
+        logger.info(f"Found {len(json_files)} JSON files")
         
         # Sort files by date in the filename
         sorted_files = sorted(json_files, key=lambda x: x.split('.')[0])
-        logging.info(f"Files will be processed in this order: {sorted_files}")
+        logger.info(f"Files will be processed in this order: {sorted_files}")
 
         latest_file = sorted_files[-1]
-        logging.info(f"Latest file: {latest_file}")
+        logger.info(f"Latest file: {latest_file}")
 
         # Insert static data from the latest file
         process_static_data(os.path.join(input_directory, latest_file), static_cursor)

@@ -3,32 +3,13 @@ import json
 import os
 from datetime import datetime, timedelta
 import time
-import logging
 import sys
 from tqdm import tqdm
 import argparse
 
-# Set up logging to both file and console
-def setup_logging():
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
+from logger_config import setup_logging
 
-    # File handler
-    file_handler = logging.FileHandler('dam_data_fetch.log')
-    file_formatter = logging.Formatter('%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-    file_handler.setFormatter(file_formatter)
-
-    # Console handler
-    console_handler = logging.StreamHandler()
-    console_formatter = logging.Formatter('%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-    console_handler.setFormatter(console_formatter)
-
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
-
-    return logger
-
-logger = setup_logging()
+logger = setup_logging(__name__)
 
 def get_dam_report(date):
     url = f'https://sinav30.conagua.gob.mx:8080/PresasPG/presas/reporte/{date}'

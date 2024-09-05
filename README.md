@@ -294,4 +294,129 @@ For those interested in the structure of our databases:
 
 Note: The `llenano` field is not stored in either database, as it can be derived from other fields if needed.
 
--------------------------------------------
+## Logging Documentation
+
+### Overview
+
+This document describes the logging setup for the Conagua data pipeline, including how to check logs and customize logging behavior for different scenarios.
+
+### Logging Setup
+
+The logging system is centralized in a `logger_config.py` file, which is used by all Python scripts in the project. The bash script that orchestrates the pipeline also logs to the same file.
+
+#### File Structure
+
+- `logger_config.py`: Central logging configuration
+- `fetch_dam_data.py`: Uses the centralized logging
+- `preprocessing.py`: Uses the centralized logging
+- `run_pipeline.sh`: Bash script that also logs to the same file
+
+### How to Check Logs
+
+The unified log file is located at `/repositories/conagua/conagua_unified.log`.
+
+To view the entire log file:
+```bash
+cat /repositories/conagua/conagua_unified.log
+```
+
+To view the last 50 lines of the log:
+```bash
+tail -n 50 /repositories/conagua/conagua_unified.log
+```
+
+To follow the log in real-time (useful for debugging):
+```bash
+tail -f /repositories/conagua/conagua_unified.log
+```
+
+### Customization Options
+
+#### In logger_config.py
+
+1. **Log Level**: 
+   - Current: `logging.INFO`
+   - Options: `logging.DEBUG`, `logging.WARNING`, `logging.ERROR`, `logging.CRITICAL`
+   - Usage: Change `logger.setLevel(logging.INFO)` to desired level
+
+2. **Log Format**:
+   - Current: `'%(asctime)s - %(name)s - %(levelname)s - %(message)s'`
+   - Customizable fields: `%(filename)s`, `%(funcName)s`, `%(lineno)d`, etc.
+
+3. **Log File Location**:
+   - Current: `/repositories/conagua/conagua_unified.log`
+   - Modify `LOG_FILE` variable to change location
+
+4. **Adding Handlers**:
+   - Current: File and Console handlers
+   - Options: Add handlers for email notifications, database logging, etc.
+
+#### In Python Scripts (fetch_dam_data.py, preprocessing.py)
+
+1. **Logger Name**:
+   - Current: `logger = setup_logging(__name__)`
+   - Options: Use a custom name, e.g., `logger = setup_logging("FetchData")`
+
+2. **Log Messages**:
+   - Use appropriate log levels: `logger.debug()`, `logger.info()`, `logger.warning()`, `logger.error()`, `logger.critical()`
+
+#### In Bash Script (run_pipeline.sh)
+
+1. **Log Message Prefix**:
+   - Current: `"[$(date +'%Y-%m-%d %H:%M:%S')] BASH - $1"`
+   - Customizable to add more information if needed
+
+2. **Log Rotation**:
+   - Current: Rotates at 10MB
+   - Modify the condition `[ $(du -m "$LOG_FILE" | cut -f1) -gt 10 ]` to change the size threshold
+
+### Scenarios and Recommendations
+
+#### Debugging
+
+1. Set log level to `DEBUG` in `logger_config.py`:
+   ```python
+   logger.setLevel(logging.DEBUG)
+   ```
+2. Add more detailed log messages in your scripts using `logger.debug()`
+
+#### Production / Avoiding Excessive Logs
+
+1. Set log level to `WARNING` or `ERROR` in `logger_config.py`:
+   ```python
+   logger.setLevel(logging.WARNING)
+   ```
+2. Increase the log rotation size in `run_pipeline.sh`:
+   ```bash
+   if [ -f "$LOG_FILE" ] && [ $(du -m "$LOG_FILE" | cut -f1) -gt 100 ]; then
+   ```
+
+#### Performance Monitoring
+
+1. Add timestamps to critical operations:
+   ```python
+   import time
+   start_time = time.time()
+   # ... operation ...
+   logger.info(f"Operation completed in {time.time() - start_time} seconds")
+   ```
+
+#### Error Alerting
+
+1. Add an email handler in `logger_config.py` for critical errors:
+   ```python
+   import logging.handlers
+   smtp_handler = logging.handlers.SMTPHandler(
+       mailhost=("smtp.example.com", 587),
+       fromaddr="alert@example.com",
+       toaddrs=["admin@example.com"],
+       subject="Conagua Pipeline Critical Error",
+       credentials=("username", "password"),
+       secure=()
+   )
+   smtp_handler.setLevel(logging.CRITICAL)
+   logger.addHandler(smtp_handler)
+   ```
+
+Remember to adjust these settings based on your specific needs and infrastructure setup.
+
