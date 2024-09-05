@@ -4,6 +4,7 @@ import os
 from datetime import datetime, timedelta
 import time
 import logging
+import sys
 from tqdm import tqdm
 import argparse
 
@@ -80,6 +81,7 @@ def main(start_date, all_dates):
     days_processed = 0
     days_with_data = 0
     api_calls = 0
+    fresh_data_fetched = False
 
     with tqdm(desc="Processing dates", unit="day") as pbar:
         while True:
@@ -88,6 +90,9 @@ def main(start_date, all_dates):
             if data_found:
                 days_with_data += 1
                 
+            if api_called and data_found:
+                fresh_data_fetched = True
+            
             if api_called:
                 api_calls += 1
             days_processed += 1
@@ -106,6 +111,8 @@ def main(start_date, all_dates):
             current_date -= timedelta(days=1)
             if api_called:
                 time.sleep(0.25)  # Only wait if an API call was made
+
+    return fresh_data_fetched
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fetch dam data for specific dates.")
@@ -126,7 +133,14 @@ if __name__ == "__main__":
         start_date = datetime.now().date()
 
     try:
-        main(start_date, args.all)
+        fresh_data_fetched = main(start_date, args.all)
+        if fresh_data_fetched:
+            logger.info("Fresh data was fetched from the API.")
+            sys.exit(0)  # Exit with 0 if fresh data was fetched
+        else:
+            logger.info("No fresh data was fetched. Used cached data.")
+            sys.exit(1)  # Exit with 1 if only cached data was used
     except KeyboardInterrupt:
         logger.info("Script stopped by user.")
         print("\nScript stopped by user. Check dam_data_fetch.log for full details.")
+        sys.exit(1)
