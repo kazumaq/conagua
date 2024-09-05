@@ -294,6 +294,132 @@ For those interested in the structure of our databases:
 
 Note: The `llenano` field is not stored in either database, as it can be derived from other fields if needed.
 
+## Crontab Documentation for Conagua Project
+
+### Overview
+
+This document provides comprehensive information about the crontab setup for the Conagua project, including its structure, how to manage jobs, and how to monitor their execution.
+
+### Current Crontab Structure
+
+The crontab for this project is defined in the `app_crontab` file in the root of the repository. Its current structure is as follows:
+
+```crontab
+CONAGUA_LOG_FILE=/repositories/conagua/conagua_unified.log
+
+# Run the data fetch and processing pipeline daily at 2 AM
+0 2 * * * /repositories/conagua/run_pipeline.sh >> /repositories/conagua/cron_execution.log 2>&1
+```
+
+### Reasoning Behind Decisions
+
+1. **Single crontab file**: We use a single `app_crontab` file to keep all project-related cron jobs in one place, making it easier to version control and manage.
+
+2. **Environment variables**: We set environment variables (like `CONAGUA_LOG_FILE`) directly in the crontab to ensure they're available to the scripts when they run.
+
+3. **Logging**: We redirect both standard output and standard error to a log file (`cron_execution.log`) to capture any issues that might occur during execution.
+
+4. **Execution time**: The job is set to run at 2 AM daily, assuming this is a low-traffic time and new data is available daily.
+
+### How to Add New Jobs
+
+To add a new job to the crontab:
+
+1. Open the `app_crontab` file in a text editor.
+2. Add a new line with the following format:
+   ```
+   * * * * * /path/to/your/script.sh >> /path/to/logfile.log 2>&1
+   ```
+   Replace the asterisks with the appropriate time specification, and adjust the script path and log file as needed.
+3. Save the file and commit it to the repository.
+4. After pushing to the server, reinstall the crontab (see "Applying Changes" section below).
+
+### Manual Modifications
+
+While it's best to manage the crontab through the versioned `app_crontab` file, you can make manual modifications if necessary:
+
+1. SSH into the server.
+2. Edit the crontab directly:
+   ```
+   crontab -e
+   ```
+3. Make your changes and save.
+
+Note: Manual changes will be overwritten the next time the crontab is installed from the `app_crontab` file.
+
+### Applying Changes
+
+After modifying the `app_crontab` file and pushing changes to the server:
+
+1. SSH into the server.
+2. Navigate to the project directory:
+   ```
+   cd /repositories/conagua
+   ```
+3. Install the updated crontab:
+   ```
+   crontab app_crontab
+   ```
+
+### Checking If a Job Is Being Executed
+
+To check if a job is currently running:
+
+1. SSH into the server.
+2. Use the `ps` command to look for the running script:
+   ```
+   ps aux | grep run_pipeline.sh
+   ```
+
+### Checking Previous Runs
+
+To check the results of previous runs:
+
+1. Examine the main log file:
+   ```
+   tail -n 100 /repositories/conagua/conagua_unified.log
+   ```
+
+2. Check the cron execution log:
+   ```
+   tail -n 100 /repositories/conagua/cron_execution.log
+   ```
+
+3. For more detailed logs, you may need to check specific log files created by individual scripts.
+
+### Troubleshooting
+
+If jobs are not running as expected:
+
+1. Check if the cron daemon is running:
+   ```
+   sudo systemctl status cron
+   ```
+
+2. Verify that the crontab is installed correctly:
+   ```
+   crontab -l
+   ```
+
+3. Check the system logs for cron-related messages:
+   ```
+   sudo grep CRON /var/log/syslog
+   ```
+
+4. Ensure that all paths in the crontab are absolute paths.
+
+5. Verify that the user running the crontab has the necessary permissions to execute the scripts and write to the log files.
+
+### Best Practices
+
+1. Always use absolute paths in crontab entries.
+2. Redirect output to log files for easier debugging.
+3. Use comments in the crontab file to describe what each job does.
+4. Test new cron jobs by setting them to run more frequently and monitoring the output.
+5. Keep the `app_crontab` file in version control and use it as the single source of truth for cron jobs.
+
+Remember to update this documentation whenever significant changes are made to the crontab setup or related processes.
+
 ## Logging Documentation
 
 ### Overview
