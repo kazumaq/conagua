@@ -3,11 +3,11 @@ import json
 import os
 from datetime import datetime, timedelta
 import time
-import logging
 from tqdm import tqdm
 import argparse
 import sys
 from logger_config import setup_logging
+from zoneinfo import ZoneInfo  # Import ZoneInfo for timezone handling
 
 logger = setup_logging(__name__)
 
@@ -100,7 +100,9 @@ def process_date(date):
         return False, True  # No data found, but API was called
 
 def main(start_date, all_dates):
-    current_date = start_date
+    # Convert start_date to Mexico City timezone
+    mexico_tz = ZoneInfo("America/Mexico_City")
+    current_date = start_date.replace(tzinfo=mexico_tz)
     days_processed = 0
     days_with_data = 0
     api_calls = 0
@@ -108,7 +110,9 @@ def main(start_date, all_dates):
 
     with tqdm(desc="Processing dates", unit="day") as pbar:
         while True:
-            data_found, api_called = process_date(current_date)
+            # Format the date string in Mexico City timezone
+            date_str = current_date.strftime('%Y-%m-%d')
+            data_found, api_called = process_date(date_str)
             
             if data_found:
                 days_with_data += 1
@@ -121,7 +125,7 @@ def main(start_date, all_dates):
             
             pbar.update(1)
             pbar.set_postfix({
-                'Date': current_date.strftime('%Y-%m-%d'),
+                'Date': date_str,
                 'Data Found': f"{days_with_data}/{days_processed}",
                 'Success Rate': f"{days_with_data/days_processed:.2%}",
                 'API Calls': api_calls
@@ -157,14 +161,15 @@ if __name__ == "__main__":
             logger.error("Connection test failed")
             sys.exit(1)
 
+    mexico_tz = ZoneInfo("America/Mexico_City")
     if args.date:
         try:
-            start_date = datetime.strptime(args.date, "%Y-%m-%d").date()
+            start_date = datetime.strptime(args.date, "%Y-%m-%d").replace(tzinfo=mexico_tz)
         except ValueError:
             logger.error("Invalid date format. Please use YYYY-MM-DD.")
             sys.exit(1)
     else:
-        start_date = datetime.now().date()
+        start_date = datetime.now(mexico_tz)
 
     try:
         exit_code = main(start_date, args.all)

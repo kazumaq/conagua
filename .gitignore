@@ -1,3 +1,4 @@
+.env
 *.log
 dam_data_fetch.log
 myenv/*

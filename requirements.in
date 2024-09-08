@@ -1,13 +1,5 @@
-chartify
-dash
 Flask
-matplotlib
-pandas
-panel
-plotly
+python-dotenv
 requests
-seaborn
-shiny
-streamlit
-tk
 tqdm
+tweepy

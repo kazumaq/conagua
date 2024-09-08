@@ -1,7 +1,5 @@
 from flask import Flask, jsonify, send_from_directory, render_template, request
 import sqlite3
-from datetime import datetime, timedelta
-import os
 import logging
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
