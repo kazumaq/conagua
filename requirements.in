@@ -1,4 +1,3 @@
-dotenv
 Flask
 python-dotenv
 requests
