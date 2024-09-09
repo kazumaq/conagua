@@ -68,6 +68,8 @@ if python fetch_dam_data.py; then
     log "fetch_dam_data.py succeeded, running preprocessing.py"
     python preprocessing.py dam_data >> "$LOG_FILE" 2>&1
     log "preprocessing.py completed"
+    python twitter_post.py >> "$LOG_FILE" 2>&1
+    log "Finished posting to X"
 else
     exit_code=$?
     log "fetch_dam_data.py failed with exit code $exit_code. Check the log file for more details."
