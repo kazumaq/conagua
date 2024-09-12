@@ -4,7 +4,7 @@ set -e
 # Lock file and Log file
 LOCK_FILE="/tmp/conagua_script.lock"
 LOG_FILE="/repositories/conagua/conagua_unified.log"
-MAX_LOCK_AGE=$((2 * 60 * 60))
+MAX_LOCK_AGE=$((20 * 60))
 
 # Function for logging
 log() {
