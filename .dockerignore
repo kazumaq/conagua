@@ -1,0 +1,9 @@
+.env
+*.log
+dam_data_fetch.log
+myenv/
+.DS_Store
+repo.*
+__pycache__/
+.git
+.gitignore
