@@ -1,9 +1,13 @@
+import os
 from flask import Flask, jsonify, send_from_directory, render_template, request
 import sqlite3
 import logging
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 logging.basicConfig(level=logging.DEBUG)
+
+# Use environment variables for configuration
+app.config['DATABASE'] = os.environ.get('DATABASE_URL', 'sqlite:///reservoir_dynamic.db')
 
 def get_db_connection(db_name):
     try:

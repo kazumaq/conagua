@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./dam_data:/app/dam_data
+      - ./static:/app/static
+      - ./static_pages:/app/static_pages
+    environment:
+      - FLASK_ENV=production
+  db:
+    image: sqlite:3
+    volumes:
+      - ./data:/data
