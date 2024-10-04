@@ -17,6 +17,7 @@ const translations = {
         updateGraph: "Update Graph",
         reservoirData: "Reservoir Data",
         reservoirName: "Reservoir Name",
+        state: "State",
         currentVolume: "Current Volume (hm³)",
         percentageFull: "Percentage Full",
         lakeChapalaVolume: "Lake Chapala Volume",
@@ -33,6 +34,7 @@ const translations = {
         updateGraph: "Actualizar Gráfico",
         reservoirData: "Datos de Embalses",
         reservoirName: "Nombre del Embalse",
+        state: "Estado",
         currentVolume: "Volumen Actual (hm³)",
         percentageFull: "Porcentaje Lleno",
         lakeChapalaVolume: "Volumen del Lago de Chapala",
@@ -176,13 +178,18 @@ function createReservoirTable(reservoirData, lakeData) {
 }
 
 function createTableRow(data) {
-    const row = document.createElement('tr');
-    row.innerHTML = `
-        <td>${data.nombrecomun}</td>
-        <td>${data.almacenaactual.toFixed(2)}</td>
-        <td>${data.fill_percentage.toFixed(2)}%</td>
-    `;
-    return row;
+  const row = document.createElement('tr');
+  const startDate = document.getElementById('start-date').value;
+  const endDate = document.getElementById('end-date').value;
+  const reservoirLink = `/embalses/niveles?state=${encodeURIComponent(data.estado)}&reservoir=${encodeURIComponent(data.clavesih)}&startDate=${startDate}&endDate=${endDate}`;
+  
+  row.innerHTML = `
+      <td><a href="${reservoirLink}">${data.nombrecomun}</a></td>
+      <td>${data.estado}</td>
+      <td>${data.almacenaactual.toFixed(2)}</td>
+      <td>${data.fill_percentage.toFixed(2)}%</td>
+  `;
+  return row;
 }
 
 async function updateGraph() {
