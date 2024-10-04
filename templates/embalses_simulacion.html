@@ -16,23 +16,17 @@
             align-items: center;
             background-color: #f0f0f0;
         }
-        h1 {
+        h1, h2 {
             color: #333;
         }
-        #controls {
+        #controls, #visualization, #reservoir-table {
             margin-bottom: 20px;
             background-color: #fff;
             padding: 15px;
             border-radius: 5px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        #visualization {
             width: 100%;
             max-width: 1000px;
-            background-color: #fff;
-            padding: 20px;
-            border-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
         #graph {
             width: 100%;
@@ -57,6 +51,21 @@
         button:hover {
             background-color: #45a049;
         }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
     </style>
 </head>
 <body>
@@ -70,6 +79,21 @@
     </div>
     <div id="visualization">
         <canvas id="graph"></canvas>
+    </div>
+    <div id="reservoir-table">
+        <h2>Reservoir Data</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Reservoir Name</th>
+                    <th>Current Volume (hm³)</th>
+                    <th>Percentage Full</th>
+                </tr>
+            </thead>
+            <tbody id="reservoir-table-body">
+                <!-- Table rows will be dynamically inserted here -->
+            </tbody>
+        </table>
     </div>
     <script src="/static/basin_visualization.js"></script>
 </body>

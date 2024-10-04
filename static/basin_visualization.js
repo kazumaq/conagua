@@ -42,20 +42,26 @@ function createOrUpdateChart(data) {
                 label: 'Lake Chapala Volume',
                 data: data.lakeVolume,
                 borderColor: 'blue',
-                fill: false
+                fill: false,
+                borderWidth: 1,
+                pointRadius: 0
             },
             {
                 label: 'Other Reservoirs Volume',
                 data: data.reservoirVolume,
                 borderColor: 'green',
-                fill: false
+                fill: false,
+                borderWidth: 1,
+                pointRadius: 0
             },
             {
                 label: 'Lake Chapala Historical Average',
                 data: Array(data.dates.length).fill(data.historicalAverage),
                 borderColor: 'red',
                 borderDash: [5, 5],
-                fill: false
+                fill: false,
+                borderWidth: 1,
+                pointRadius: 0
             }
         ]
     };
@@ -92,6 +98,35 @@ function createOrUpdateChart(data) {
     }
 }
 
+function createReservoirTable(reservoirData, lakeData) {
+    const tableBody = document.getElementById('reservoir-table-body');
+    tableBody.innerHTML = ''; // Clear existing rows
+
+    // Add Lake Chapala
+    const lakeLatest = lakeData[lakeData.length - 1];
+    const lakeRow = createTableRow(lakeLatest);
+    tableBody.appendChild(lakeRow);
+
+    // Add other reservoirs
+    reservoirData.forEach(reservoir => {
+        if (reservoir.length > 0) {
+            const latestData = reservoir[reservoir.length - 1];
+            const row = createTableRow(latestData);
+            tableBody.appendChild(row);
+        }
+    });
+}
+
+function createTableRow(data) {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+        <td>${data.nombrecomun}</td>
+        <td>${data.almacenaactual.toFixed(2)}</td>
+        <td>${data.fill_percentage.toFixed(2)}%</td>
+    `;
+    return row;
+}
+
 async function updateGraph() {
     const startDate = document.getElementById('start-date').value;
     const endDate = document.getElementById('end-date').value;
@@ -105,6 +140,7 @@ async function updateGraph() {
         const { reservoirData, lakeData } = await fetchData(startDate, endDate);
         const processedData = processData(reservoirData, lakeData);
         createOrUpdateChart(processedData);
+        createReservoirTable(reservoirData, lakeData);
     } catch (error) {
         console.error('Error updating graph:', error);
         alert('Failed to update graph. Please try again.');
