@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lerma-Chapala Basin Visualization</title>
+    <title data-translate="title">Lerma-Chapala Basin Visualization</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <style>
@@ -32,7 +32,7 @@
             width: 100%;
             height: 400px;
         }
-        label, input, button {
+        label, input, button, select {
             margin: 5px;
         }
         button {
@@ -69,25 +69,36 @@
     </style>
 </head>
 <body>
-    <h1>Lerma-Chapala Basin Visualization</h1>
+    <h1 data-translate="title">Lerma-Chapala Basin Visualization</h1>
     <div id="controls">
-        <label for="start-date">Start Date:</label>
-        <input type="date" id="start-date">
-        <label for="end-date">End Date:</label>
-        <input type="date" id="end-date">
-        <button id="update-graph">Update Graph</button>
+        <label>
+            <span data-translate="language">Language</span>
+            <select id="languageSelect">
+                <option value="en">English</option>
+                <option value="es">Español</option>
+            </select>
+        </label>
+        <label for="start-date">
+            <span data-translate="startDate">Start Date</span>
+            <input type="date" id="start-date">
+        </label>
+        <label for="end-date">
+            <span data-translate="endDate">End Date</span>
+            <input type="date" id="end-date">
+        </label>
+        <button id="update-graph" data-translate="updateGraph">Update Graph</button>
     </div>
     <div id="visualization">
         <canvas id="graph"></canvas>
     </div>
     <div id="reservoir-table">
-        <h2>Reservoir Data</h2>
+        <h2 data-translate="reservoirData">Reservoir Data</h2>
         <table>
             <thead>
                 <tr>
-                    <th>Reservoir Name</th>
-                    <th>Current Volume (hm³)</th>
-                    <th>Percentage Full</th>
+                    <th data-translate="reservoirName">Reservoir Name</th>
+                    <th data-translate="currentVolume">Current Volume (hm³)</th>
+                    <th data-translate="percentageFull">Percentage Full</th>
                 </tr>
             </thead>
             <tbody id="reservoir-table-body">
