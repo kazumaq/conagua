@@ -53,6 +53,38 @@ const translations = {
 
 let currentLanguage = 'en';
 
+// Fetch list of states
+function fetchStates() {
+    console.log("Fetching states...");
+    return fetch('/api/states')
+        .then(response => {
+            console.log("Received response from /api/states:", response);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            return response.json();
+        })
+        .then(states => {
+            console.log("States retrieved:", states);
+            populateSelect('stateSelect', states, defaultState);
+            return defaultState;
+        })
+        .catch(error => {
+            console.error('Error fetching states:', error);
+            alert(translations[currentLanguage].errorFetchingStates);
+            throw error;
+        });
+}
+
+function updateURL(state, reservoir, startDate, endDate) {
+    const params = new URLSearchParams({
+        state: state,
+        reservoir: reservoir,
+        startDate: startDate,
+        endDate: endDate
+    });
+    const newURL = `${window.location.pathname}?${params.toString()}`;
+    window.history.pushState({}, '', newURL);
+}
+
 // Function to change language
 function changeLanguage(lang) {
     currentLanguage = lang;
@@ -71,26 +103,6 @@ function changeLanguage(lang) {
     document.getElementById('endDate').placeholder = translations[lang].endDate;
 }
 
-// Fetch list of states
-function fetchStates() {
-    console.log("Fetching states...");
-    return fetch('/api/states')
-        .then(response => {
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            return response.json();
-        })
-        .then(states => {
-            console.log("States retrieved:", states);
-            populateSelect('stateSelect', states, defaultState);
-            return defaultState;
-        })
-        .catch(error => {
-            console.error('Error fetching states:', error);
-            alert(translations[currentLanguage].errorFetchingStates);
-            throw error;
-        });
-}
-
 // Initialize the application
 function init() {
     console.log("Initializing application...");
@@ -102,11 +114,25 @@ function init() {
     document.getElementById('startDate').value = formatDate(startDate);
     document.getElementById('endDate').value = formatDate(endDate);
 
+    // Get URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const stateParam = urlParams.get('state');
+    const reservoirParam = urlParams.get('reservoir');
+    const startDateParam = urlParams.get('startDate');
+    const endDateParam = urlParams.get('endDate');
+
     fetchStates()
-        .then(fetchReservoirs)
-        .then(loadReservoirData)
+        .then(state => {
+            console.log(`Fetched states, default state: ${state}`);
+            return fetchReservoirs(state);
+        })
+        .then(reservoir => {
+            console.log(`Fetched reservoirs, default reservoir: ${reservoir}`);
+            return loadReservoirData(reservoir);
+        })
         .catch(error => {
             console.error('Error initializing application:', error);
+            displayErrorMessage(error);
         });
 
     document.getElementById('languageSelect').addEventListener('change', (e) => changeLanguage(e.target.value));
@@ -116,9 +142,12 @@ function init() {
 function fetchReservoirs(state) {
     console.log(`Fetching reservoirs for state: ${state}`);
     return fetch(`/api/reservoirs/${state}`)
-        .then(response => response.json())
+        .then(response => {
+            console.log(`Received response from /api/reservoirs/${state}:`, response);
+            return response.json();
+        })
         .then(reservoirs => {
-            console.log(`Retrieved ${reservoirs.length} reservoirs for ${state}`);
+            console.log(`Retrieved ${reservoirs.length} reservoirs for ${state}:`, reservoirs);
             populateSelect('reservoirSelect', reservoirs.map(r => ({ value: r.clavesih, text: `${r.nombrecomun} (${r.clavesih})` })), defaultReservoir);
             
             // Check if the default reservoir exists
@@ -132,7 +161,8 @@ function fetchReservoirs(state) {
             return defaultReservoir;
         })
         .catch(error => {
-            console.error(translations[currentLanguage].errorFetchingReservoirs, error);
+            console.error(`Error fetching reservoirs for state ${state}:`, error);
+            alert(translations[currentLanguage].errorFetchingReservoirs);
             throw error;
         });
 }
@@ -180,13 +210,6 @@ function displayNoDataMessage() {
     chartContainer.innerHTML = '<p>No data available for the selected date range.</p>';
     const latestDataDiv = document.getElementById('latestData');
     latestDataDiv.innerHTML = '<p>No current data available.</p>';
-}
-
-function displayErrorMessage(error) {
-    const chartContainer = document.getElementById('reservoirChart');
-    chartContainer.innerHTML = `<p>Error loading data: ${error.message}</p>`;
-    const latestDataDiv = document.getElementById('latestData');
-    latestDataDiv.innerHTML = '<p>Error loading latest data.</p>';
 }
 
 // Process and display reservoir data
@@ -276,29 +299,48 @@ function populateSelect(selectId, options, defaultValue) {
 
 // Function to update data based on date range
 function updateDataRange() {
-    const startDate = new Date(document.getElementById('startDate').value);
-    const endDate = new Date(document.getElementById('endDate').value);
-
-    console.log(`Updating data range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
-
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    const state = document.getElementById('stateSelect').value;
+    const reservoir = document.getElementById('reservoirSelect').value;
+    
+    updateURL(state, reservoir, startDate, endDate);
+    
     if (currentData) {
         const filteredData = currentData.filter(d => {
             const date = new Date(d.fechamonitoreo);
-            return date >= startDate && date <= endDate;
+            return date >= new Date(startDate) && date <= new Date(endDate);
         });
         console.log(`Filtered ${filteredData.length} data points`);
         updateChart(filteredData);
     } else {
         console.error(translations[currentLanguage].noCurrentData);
+        displayErrorMessage(new Error(translations[currentLanguage].noCurrentData));
     }
+}
+
+function displayErrorMessage(error) {
+    const chartContainer = document.getElementById('reservoirChart');
+    chartContainer.innerHTML = `<p>Error: ${error.message}</p>`;
+    const latestDataDiv = document.getElementById('latestData');
+    latestDataDiv.innerHTML = '<p>Error loading latest data.</p>';
 }
 
 // Event listeners
 document.addEventListener('DOMContentLoaded', () => {
     console.log("DOM fully loaded and parsed");
     
-    document.getElementById('stateSelect').addEventListener('change', (e) => fetchReservoirs(e.target.value));
-    document.getElementById('reservoirSelect').addEventListener('change', (e) => loadReservoirData(e.target.value));
+    document.getElementById('stateSelect').addEventListener('change', (e) => {
+        fetchReservoirs(e.target.value).then(reservoir => {
+            updateURL(e.target.value, reservoir, document.getElementById('startDate').value, document.getElementById('endDate').value);
+        });
+    });
+
+    document.getElementById('reservoirSelect').addEventListener('change', (e) => {
+        loadReservoirData(e.target.value);
+        updateURL(document.getElementById('stateSelect').value, e.target.value, document.getElementById('startDate').value, document.getElementById('endDate').value);
+    });
+
     document.getElementById('startDate').addEventListener('change', updateDataRange);
     document.getElementById('endDate').addEventListener('change', updateDataRange);
     

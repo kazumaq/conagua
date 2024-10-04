@@ -87,6 +87,21 @@
     
     <div id="latestData"></div>
 
+    <script>
+        // Add this script to set initial values based on URL parameters
+        document.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            const state = params.get('state');
+            const reservoir = params.get('reservoir');
+            const startDate = params.get('startDate');
+            const endDate = params.get('endDate');
+
+            if (state) document.getElementById('stateSelect').value = state;
+            if (reservoir) document.getElementById('reservoirSelect').value = reservoir;
+            if (startDate) document.getElementById('startDate').value = startDate;
+            if (endDate) document.getElementById('endDate').value = endDate;
+        });
+    </script>
     <script type="module" src="/static/app.js"></script>
 </body>
 </html>
