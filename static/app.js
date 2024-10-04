@@ -81,8 +81,14 @@ function updateURL(state, reservoir, startDate, endDate) {
         startDate: startDate,
         endDate: endDate
     });
-    const newURL = `${window.location.pathname}?${params.toString()}`;
-    window.history.pushState({}, '', newURL);
+    const newURL = `https://${window.location.hostname}${window.location.pathname}?${params.toString()}`;
+    console.log('Updating URL to:', newURL);
+    try {
+        window.history.replaceState({}, '', newURL);
+        console.log('URL updated successfully');
+    } catch (error) {
+        console.error('Error updating URL:', error);
+    }
 }
 
 // Function to change language
