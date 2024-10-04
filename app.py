@@ -1,7 +1,8 @@
 import os
-from flask import Flask, jsonify, send_from_directory, render_template, request
+from flask import Flask, jsonify, send_from_directory, render_template, request, abort
 import sqlite3
 import logging
+from datetime import datetime, timedelta
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 logging.basicConfig(level=logging.DEBUG)
@@ -28,12 +29,47 @@ def embalses_main():
 
 @app.route('/embalses/niveles')
 def embalses_niveles():
-    # Your existing code for showing reservoir levels
-    return render_template('embalses_niveles.html')
+    state = request.args.get('state', default=None, type=str)
+    reservoir = request.args.get('reservoir', default=None, type=str)
+    start_date = request.args.get('startDate', default=None, type=str)
+    end_date = request.args.get('endDate', default=None, type=str)
+    
+    # Validate state
+    if state:
+        conn = get_db_connection('reservoir_static.db')
+        cursor = conn.cursor()
+        cursor.execute('SELECT DISTINCT estado FROM reservoirs WHERE estado = ?', (state,))
+        if not cursor.fetchone():
+            state = None
+        conn.close()
+    
+    # Validate reservoir
+    if reservoir:
+        conn = get_db_connection('reservoir_static.db')
+        cursor = conn.cursor()
+        cursor.execute('SELECT clavesih FROM reservoirs WHERE clavesih = ?', (reservoir,))
+        if not cursor.fetchone():
+            reservoir = None
+        conn.close()
+    
+    # Validate dates
+    try:
+        if start_date:
+            datetime.strptime(start_date, '%Y-%m-%d')
+        if end_date:
+            datetime.strptime(end_date, '%Y-%m-%d')
+    except ValueError:
+        start_date = None
+        end_date = None
+    
+    return render_template('embalses_niveles.html', 
+                           state=state, 
+                           reservoir=reservoir, 
+                           start_date=start_date, 
+                           end_date=end_date)
 
 @app.route('/embalses/simulacion')
 def embalses_simulacion():
-    # This function will handle the logic for your simulation page
     return render_template('embalses_simulacion.html')
 
 @app.route('/api/states')
@@ -90,6 +126,15 @@ def calculate_fill_percentage(almacenaactual, namoalmac):
 def get_reservoir_data(clavesih):
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
+
+    # Validate dates
+    try:
+        if start_date:
+            datetime.strptime(start_date, '%Y-%m-%d')
+        if end_date:
+            datetime.strptime(end_date, '%Y-%m-%d')
+    except ValueError:
+        return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD.'}), 400
 
     # Connect to both databases
     dynamic_conn = get_db_connection('reservoir_dynamic.db')
@@ -158,4 +203,3 @@ def get_latest_data(clavesih):
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
-
