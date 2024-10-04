@@ -106,14 +106,7 @@ function changeLanguage(lang) {
 // Initialize the application
 function init() {
     console.log("Initializing application...");
-    // Set default dates
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setMonth(startDate.getMonth() - 1);
     
-    document.getElementById('startDate').value = formatDate(startDate);
-    document.getElementById('endDate').value = formatDate(endDate);
-
     // Get URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     const stateParam = urlParams.get('state');
@@ -121,14 +114,34 @@ function init() {
     const startDateParam = urlParams.get('startDate');
     const endDateParam = urlParams.get('endDate');
 
+    // Set date inputs
+    const endDate = endDateParam ? new Date(endDateParam) : new Date();
+    const startDate = startDateParam ? new Date(startDateParam) : new Date(endDate.getFullYear(), endDate.getMonth() - 1, endDate.getDate());
+    
+    document.getElementById('startDate').value = formatDate(startDate);
+    document.getElementById('endDate').value = formatDate(endDate);
+
     fetchStates()
-        .then(state => {
-            console.log(`Fetched states, default state: ${state}`);
-            return fetchReservoirs(state);
+        .then(defaultState => {
+            const stateToUse = stateParam || defaultState;
+            document.getElementById('stateSelect').value = stateToUse;
+            return fetchReservoirs(stateToUse);
         })
-        .then(reservoir => {
-            console.log(`Fetched reservoirs, default reservoir: ${reservoir}`);
-            return loadReservoirData(reservoir);
+        .then(reservoirs => {
+            if (reservoirParam) {
+                document.getElementById('reservoirSelect').value = reservoirParam;
+                return loadReservoirData(reservoirParam);
+            } else if (!stateParam && !reservoirParam) {
+                // If no parameters are provided, default to Lake Chapala
+                document.getElementById('stateSelect').value = 'Jalisco';
+                return fetchReservoirs('Jalisco').then(() => {
+                    document.getElementById('reservoirSelect').value = 'LDCJL';
+                    return loadReservoirData('LDCJL');
+                });
+            } else if (reservoirs && reservoirs.length > 0) {
+                document.getElementById('reservoirSelect').value = reservoirs[0].clavesih;
+                return loadReservoirData(reservoirs[0].clavesih);
+            }
         })
         .catch(error => {
             console.error('Error initializing application:', error);
@@ -144,27 +157,34 @@ function fetchReservoirs(state) {
     return fetch(`/api/reservoirs/${state}`)
         .then(response => {
             console.log(`Received response from /api/reservoirs/${state}:`, response);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             return response.json();
         })
         .then(reservoirs => {
             console.log(`Retrieved ${reservoirs.length} reservoirs for ${state}:`, reservoirs);
-            populateSelect('reservoirSelect', reservoirs.map(r => ({ value: r.clavesih, text: `${r.nombrecomun} (${r.clavesih})` })), defaultReservoir);
+            populateSelect('reservoirSelect', reservoirs.map(r => ({ value: r.clavesih, text: `${r.nombrecomun} (${r.clavesih})` })), null);
             
-            // Check if the default reservoir exists
-            const reservoirSelect = document.getElementById('reservoirSelect');
-            const defaultReservoirOption = Array.from(reservoirSelect.options).find(option => option.value === defaultReservoir);
-            if (!defaultReservoirOption) {
-                console.warn(`Default reservoir ${defaultReservoir} not found in the list. Using the first available reservoir.`);
-                defaultReservoir = reservoirSelect.options[0].value;
-            }
+            // Clear the current chart
+            clearChart();
             
-            return defaultReservoir;
+            // Enable the reservoir select
+            document.getElementById('reservoirSelect').disabled = false;
+            
+            return reservoirs;
         })
         .catch(error => {
             console.error(`Error fetching reservoirs for state ${state}:`, error);
             alert(translations[currentLanguage].errorFetchingReservoirs);
             throw error;
         });
+}
+
+// Clear the current chart
+function clearChart() {
+    const chartContainer = document.getElementById('reservoirChart');
+    chartContainer.innerHTML = '<p>Please select a reservoir</p>';
+    const latestDataDiv = document.getElementById('latestData');
+    latestDataDiv.innerHTML = '';
 }
 
 // Load and display reservoir data
@@ -331,14 +351,17 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log("DOM fully loaded and parsed");
     
     document.getElementById('stateSelect').addEventListener('change', (e) => {
-        fetchReservoirs(e.target.value).then(reservoir => {
-            updateURL(e.target.value, reservoir, document.getElementById('startDate').value, document.getElementById('endDate').value);
+        fetchReservoirs(e.target.value).then(() => {
+            // Clear the current chart when state changes
+            clearChart();
         });
     });
 
     document.getElementById('reservoirSelect').addEventListener('change', (e) => {
-        loadReservoirData(e.target.value);
-        updateURL(document.getElementById('stateSelect').value, e.target.value, document.getElementById('startDate').value, document.getElementById('endDate').value);
+        if (e.target.value) {
+            loadReservoirData(e.target.value);
+            updateURL(document.getElementById('stateSelect').value, e.target.value, document.getElementById('startDate').value, document.getElementById('endDate').value);
+        }
     });
 
     document.getElementById('startDate').addEventListener('change', updateDataRange);
